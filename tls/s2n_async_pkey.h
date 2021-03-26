@@ -62,6 +62,7 @@ struct s2n_async_pkey_op;
     return s2n_result_is_ok(s2n_async_pkey_sign(conn, sig_alg, digest, on_complete)) ? S2N_SUCCESS : S2N_FAILURE;
 
 int s2n_async_pkey_op_perform(struct s2n_async_pkey_op *op, s2n_cert_private_key *key);
+int s2n_async_pkey_op_offload(struct s2n_async_pkey_op *op, s2n_sign_cb sign_fn);
 int s2n_async_pkey_op_apply(struct s2n_async_pkey_op *op, struct s2n_connection *conn);
 int s2n_async_pkey_op_free(struct s2n_async_pkey_op *op);
 

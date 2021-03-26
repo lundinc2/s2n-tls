@@ -71,11 +71,37 @@ typedef enum {
     S2N_ERR_T_USAGE
 } s2n_error_type;
 
+typedef enum {
+    S2N_HASH_NONE,
+    S2N_HASH_MD5,
+    S2N_HASH_SHA1,
+    S2N_HASH_SHA224,
+    S2N_HASH_SHA256,
+    S2N_HASH_SHA384,
+    S2N_HASH_SHA512,
+    S2N_HASH_MD5_SHA1,
+    /* Don't add any hash algorithms below S2N_HASH_SENTINEL */
+    S2N_HASH_SENTINEL
+} s2n_hash_algorithm;
+
+typedef int (*s2n_sign_cb)( s2n_hash_algorithm hash_alg, 
+                 const uint8_t * hash_buf, 
+                 uint32_t hash_len, 
+                 uint8_t * signature_buf, 
+                 uint32_t * signature_buf_len_ptr );
+
+S2N_API
+extern int s2n_error_get_type(int error);
+
 S2N_API
 extern int s2n_error_get_type(int error);
 
 struct s2n_config;
 struct s2n_connection;
+
+S2N_API 
+extern int s2n_config_set_pkey_sign_callback(struct s2n_config *config, s2n_sign_cb fn, uint32_t signature_size);
+
 
 S2N_API
 extern unsigned long s2n_get_openssl_version(void);
