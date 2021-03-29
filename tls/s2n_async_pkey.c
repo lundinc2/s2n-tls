@@ -25,8 +25,6 @@
 #include "utils/s2n_result.h"
 #include "utils/s2n_safety.h"
 
-typedef enum { S2N_ASYNC_DECRYPT, S2N_ASYNC_SIGN } s2n_async_pkey_op_type;
-
 struct s2n_async_pkey_decrypt_data {
     s2n_async_pkey_decrypt_complete on_complete;
     struct s2n_blob                 encrypted;
@@ -454,3 +452,22 @@ S2N_RESULT s2n_async_pkey_sign_free(struct s2n_async_pkey_op *op)
 
     return S2N_RESULT_OK;
 }
+
+int s2n_async_get_op_type(struct s2n_async_pkey_op *op, s2n_async_pkey_op_type * type)
+{
+    POSIX_ENSURE_REF(op);
+
+
+    switch (op->type) {
+        case S2N_ASYNC_DECRYPT:
+            *type = S2N_ASYNC_DECRYPT;
+            return S2N_SUCCESS;
+        case S2N_ASYNC_SIGN:
+            *type = S2N_ASYNC_SIGN;
+            return S2N_SUCCESS;
+            /* No default for compiler warnings */
+    }
+
+    return S2N_FAILURE;
+}
+
