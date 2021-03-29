@@ -87,7 +87,7 @@ static int try_handshake(struct s2n_connection *server_conn, struct s2n_connecti
 int pkcs11_sign( s2n_hash_algorithm hash_alg, 
                  const uint8_t * hash_buf, 
                  uint32_t hash_len, 
-                 uint8_t * signature_buf, 
+                 uint8_t ** signature_buf, 
                  uint32_t * signature_buf_len_ptr )
 {
     CK_FUNCTION_LIST_PTR functionList = NULL;
@@ -113,7 +113,7 @@ int pkcs11_sign( s2n_hash_algorithm hash_alg,
                                               &slotCount));
 
     /* For now take the first slot, but need a better mechanism to find the test slot. */
-    POSIX_GUARD(functionList->C_OpenSession(slotId[ 1 ],
+    POSIX_GUARD(functionList->C_OpenSession(slotId[2],
                                              CKF_SERIAL_SESSION | CKF_RW_SESSION,
                                               NULL,
                                               NULL, 
@@ -123,7 +123,7 @@ int pkcs11_sign( s2n_hash_algorithm hash_alg,
                                         CKU_USER,
                                         pin,
                                         sizeof(pin)-1UL));
-    CK_UTF8CHAR label[] = "mytoken1";
+    CK_UTF8CHAR label[] = "rsa-privkey";
     CK_ULONG count = 0;
     CK_OBJECT_CLASS key_class = CKO_PRIVATE_KEY;
 
@@ -150,22 +150,29 @@ int pkcs11_sign( s2n_hash_algorithm hash_alg,
     EXPECT_TRUE(handle != CK_INVALID_HANDLE);
     EXPECT_TRUE(count != 0);
 
+
     CK_MECHANISM mechanism = {CKM_RSA_PKCS, NULL, 0 };
-    CK_BYTE signature[2048] = {0};
-    CK_ULONG signatureLength = sizeof(signature);
 
     POSIX_GUARD(functionList->C_SignInit(session,
                                            &mechanism,
                                            handle));
 
 
-    CK_BYTE temp_hash[2048] = {0};
-    (void)memcpy(temp_hash, hash_buf, hash_len);
+    CK_ULONG signatureLength = 0;
     POSIX_GUARD(functionList->C_Sign(session,
-                                       temp_hash,
+                                       hash_buf,
                                        hash_len,
-                                       signature,
+                                       NULL,
                                        &signatureLength));
+
+    *signature_buf = malloc(signatureLength);
+    POSIX_GUARD_PTR(signature_buf);
+    POSIX_GUARD(functionList->C_Sign(session,
+                                       hash_buf,
+                                       hash_len,
+                                       *signature_buf,
+                                       &signatureLength));
+    *signature_buf_len_ptr = signatureLength;
 
     return 0;
 }

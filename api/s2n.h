@@ -87,7 +87,7 @@ typedef enum {
 typedef int (*s2n_sign_cb)( s2n_hash_algorithm hash_alg, 
                  const uint8_t * hash_buf, 
                  uint32_t hash_len, 
-                 uint8_t * signature_buf, 
+                 uint8_t ** signature_buf, 
                  uint32_t * signature_buf_len_ptr );
 
 S2N_API

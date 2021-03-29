@@ -420,11 +420,10 @@ S2N_RESULT s2n_async_pkey_sign_offload(struct s2n_async_pkey_op *op, s2n_sign_cb
 
 
     uint8_t * sig = NULL;
-    uint32_t * siglen = NULL;
+    uint32_t siglen = 0;
 
-    RESULT_GUARD_POSIX(sign_fn(digest->alg, digest_data, digest_length, sig, siglen));
+    RESULT_GUARD_POSIX(sign_fn(digest->alg, digest_data, digest_length, &sig, &siglen));
     RESULT_ENSURE_REF(sig);
-    RESULT_ENSURE_REF(siglen);
 
     return S2N_RESULT_OK;
 }
