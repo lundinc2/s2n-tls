@@ -579,6 +579,7 @@ S2N_API
 extern const char *s2n_connection_get_last_message_name(struct s2n_connection *conn);
 
 struct s2n_async_pkey_op;
+typedef enum { S2N_ASYNC_DECRYPT, S2N_ASYNC_SIGN } s2n_async_pkey_op_type;
 
 typedef int (*s2n_async_pkey_fn)(struct s2n_connection *conn, struct s2n_async_pkey_op *op);
 S2N_API
@@ -586,9 +587,14 @@ extern int s2n_config_set_async_pkey_callback(struct s2n_config *config, s2n_asy
 S2N_API
 extern int s2n_async_pkey_op_perform(struct s2n_async_pkey_op *op, s2n_cert_private_key *key);
 S2N_API
+extern int s2n_async_pkey_op_offload(struct s2n_async_pkey_op *op, s2n_sign_cb sign_fn);
+S2N_API
 extern int s2n_async_pkey_op_apply(struct s2n_async_pkey_op *op, struct s2n_connection *conn);
 S2N_API
 extern int s2n_async_pkey_op_free(struct s2n_async_pkey_op *op);
+
+S2N_API
+extern int s2n_async_get_op_type(struct s2n_async_pkey_op *op, s2n_async_pkey_op_type * type);
 
 /**
  * Callback function for handling key log events
