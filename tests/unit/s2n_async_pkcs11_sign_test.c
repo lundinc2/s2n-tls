@@ -25,14 +25,13 @@
 #include "tls/s2n_cipher_suites.h"
 #include "utils/s2n_safety.h"
 
-
-
 #define CK_PTR    *
 #define NULL_PTR    0
 #define CK_DEFINE_FUNCTION( returnType, name )             returnType name
 #define CK_DECLARE_FUNCTION( returnType, name )            returnType name
 #define CK_DECLARE_FUNCTION_POINTER( returnType, name )    returnType( CK_PTR name )
 #define CK_CALLBACK_FUNCTION( returnType, name )           returnType( CK_PTR name )
+
 #include "pkcs11.h"
 
 struct s2n_async_pkey_op *pkey_op = NULL;
