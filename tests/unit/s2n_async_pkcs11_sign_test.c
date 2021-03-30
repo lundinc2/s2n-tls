@@ -83,11 +83,11 @@ static int try_handshake(struct s2n_connection *server_conn, struct s2n_connecti
 
     return S2N_SUCCESS;
 }
-int pkcs11_sign( s2n_hash_algorithm hash_alg, 
+
+int pkcs11_sign( struct s2n_async_pkey_op *op,
+                 s2n_hash_algorithm hash_alg, 
                  const uint8_t * hash_buf, 
-                 uint32_t hash_len, 
-                 uint8_t ** signature_buf, 
-                 uint32_t * signature_buf_len_ptr )
+                 uint32_t hash_len )
 {
     CK_FUNCTION_LIST_PTR functionList = NULL;
     CK_SESSION_HANDLE session = CK_INVALID_HANDLE;
@@ -157,21 +157,23 @@ int pkcs11_sign( s2n_hash_algorithm hash_alg,
                                            handle));
 
 
-    CK_ULONG signatureLength = 0;
+    CK_ULONG siglen = 0;
     POSIX_GUARD(functionList->C_Sign(session,
                                        hash_buf,
                                        hash_len,
                                        NULL,
-                                       &signatureLength));
+                                       &siglen));
 
-    *signature_buf = malloc(signatureLength);
-    POSIX_GUARD_PTR(signature_buf);
+    uint8_t * sig = malloc(siglen);
+    POSIX_GUARD_PTR(sig);
     POSIX_GUARD(functionList->C_Sign(session,
                                        hash_buf,
                                        hash_len,
-                                       *signature_buf,
-                                       &signatureLength));
-    *signature_buf_len_ptr = signatureLength;
+                                       sig,
+                                       &siglen));
+
+    EXPECT_SUCCESS(s2n_async_pkey_op_copy(op, sig, siglen));
+    free(sig);
 
     return 0;
 }
