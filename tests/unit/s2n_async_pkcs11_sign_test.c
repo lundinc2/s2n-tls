@@ -84,34 +84,29 @@ static int try_handshake(struct s2n_connection *server_conn, struct s2n_connecti
     return S2N_SUCCESS;
 }
 
-int pkcs11_sign( struct s2n_async_pkey_op *op,
+static int pkcs11_sign( struct s2n_async_pkey_op *op,
                  s2n_hash_algorithm hash_alg, 
                  const uint8_t * hash_buf, 
                  uint32_t hash_len )
 {
-    CK_FUNCTION_LIST_PTR functionList = NULL;
-    CK_SESSION_HANDLE session = CK_INVALID_HANDLE;
-    CK_ULONG slotCount = 0;
-    CK_SLOT_ID * slotId = NULL;
-    CK_OBJECT_HANDLE handle = CK_INVALID_HANDLE;
     
+    CK_FUNCTION_LIST_PTR functionList = NULL;
     POSIX_GUARD(C_GetFunctionList(&functionList));
     POSIX_GUARD_PTR(functionList);
     POSIX_GUARD(functionList->C_Initialize(NULL));
 
+    CK_ULONG slotCount = 0;
     POSIX_GUARD(functionList->C_GetSlotList(CK_TRUE,
                                               NULL,
                                               &slotCount));
 
-    /* TODO Use S2N memory API. */
-    slotId = malloc(sizeof(CK_SLOT_ID) * (slotCount));
+    CK_SLOT_ID * slotId = malloc(sizeof(CK_SLOT_ID) * (slotCount));
     POSIX_GUARD_PTR(slotId);
 
     POSIX_GUARD(functionList->C_GetSlotList(CK_TRUE,
                                               slotId,
                                               &slotCount));
-
-    /* For now take the first slot, but need a better mechanism to find the test slot. */
+    CK_SESSION_HANDLE session = CK_INVALID_HANDLE;
     POSIX_GUARD(functionList->C_OpenSession(slotId[2],
                                              CKF_SERIAL_SESSION | CKF_RW_SESSION,
                                               NULL,
@@ -140,6 +135,7 @@ int pkcs11_sign( struct s2n_async_pkey_op *op,
 
     POSIX_GUARD(functionList->C_FindObjectsInit(session, template, sizeof(template) / sizeof(CK_ATTRIBUTE)));
 
+    CK_OBJECT_HANDLE handle = CK_INVALID_HANDLE;
     POSIX_GUARD(functionList->C_FindObjects(session,
                                              &handle,
                                              1UL,
@@ -174,6 +170,9 @@ int pkcs11_sign( struct s2n_async_pkey_op *op,
 
     EXPECT_SUCCESS(s2n_async_pkey_op_copy(op, sig, siglen));
     free(sig);
+
+    POSIX_GUARD(functionList->C_CloseSession(session));
+    POSIX_GUARD(functionList->C_Finalize(NULL));
 
     return 0;
 }
