@@ -305,8 +305,6 @@ int s2n_async_pkey_op_offload(struct s2n_async_pkey_op *op, s2n_sign_cb sign_fn)
 
     POSIX_GUARD_RESULT(actions->offload(op, sign_fn));
 
-    op->complete = true;
-
     return S2N_SUCCESS;
 }
 
