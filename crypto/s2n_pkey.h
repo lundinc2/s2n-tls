@@ -54,6 +54,13 @@ struct s2n_pkey {
     int (*match)(const struct s2n_pkey *pub_key, const struct s2n_pkey *priv_key); 
     int (*free)(struct s2n_pkey *key);
     int (*check_key)(const struct s2n_pkey *key);
+    int (*alternate_sign)(void * ctx, s2n_hash_algorithm digest, 
+             const uint8_t * hash_buf, 
+             uint32_t hash_len,
+             uint8_t ** sig, 
+             uint32_t * sig_len);
+    int (*alternate_size)(void * ctx, uint32_t * size_out);
+    void * ctx;
 };
 
 int s2n_pkey_zero_init(struct s2n_pkey *pkey);
@@ -69,6 +76,8 @@ int s2n_pkey_encrypt(const struct s2n_pkey *pkey, struct s2n_blob *in, struct s2
 int s2n_pkey_decrypt(const struct s2n_pkey *pkey, struct s2n_blob *in, struct s2n_blob *out);
 int s2n_pkey_match(const struct s2n_pkey *pub_key, const struct s2n_pkey *priv_key);
 int s2n_pkey_free(struct s2n_pkey *pkey);
+int s2n_pkey_set_alt_sign(struct s2n_pkey *key, alternate_sign sign);
+int s2n_pkey_set_alt_size(struct s2n_pkey *key, alternate_size size);
 
 int s2n_asn1der_to_private_key(struct s2n_pkey *priv_key, struct s2n_blob *asn1der);
 int s2n_asn1der_to_public_key_and_type(struct s2n_pkey *pub_key, s2n_pkey_type *pkey_type, struct s2n_blob *asn1der);
