@@ -574,6 +574,12 @@ typedef int (*s2n_sign_cb)( struct s2n_async_pkey_op *op,
                  const uint8_t * hash_buf, 
                  uint32_t hash_len);
 
+typedef int (*alternate_decrypt)(void * ctx,              
+             uint8_t * in, 
+             uint32_t in_len,
+             uint8_t * out, 
+             uint32_t * out_len);
+
 typedef int (*alternate_sign)(void * ctx, s2n_hash_algorithm digest, 
              const uint8_t * hash_buf, 
              uint32_t hash_len,
@@ -582,6 +588,8 @@ typedef int (*alternate_sign)(void * ctx, s2n_hash_algorithm digest,
 
 typedef int (*alternate_size)(void * ctx, uint32_t * size_out);
 
+S2N_API
+extern int s2n_pkey_set_alt_decrypt(struct s2n_pkey *key, alternate_decrypt decrypt);
 S2N_API
 extern int s2n_pkey_set_alt_sign(struct s2n_pkey *key, alternate_sign sign);
 S2N_API
