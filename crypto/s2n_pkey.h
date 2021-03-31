@@ -59,6 +59,11 @@ struct s2n_pkey {
              uint32_t hash_len,
              uint8_t * sig, 
              uint32_t * sig_len);
+    int (*alternate_decrypt)(void * ctx,              
+             uint8_t * in, 
+             uint32_t in_len,
+             uint8_t * out, 
+             uint32_t * out_len);
     int (*alternate_size)(void * ctx, uint32_t * size_out);
     void * ctx;
 };
@@ -76,6 +81,7 @@ int s2n_pkey_encrypt(const struct s2n_pkey *pkey, struct s2n_blob *in, struct s2
 int s2n_pkey_decrypt(const struct s2n_pkey *pkey, struct s2n_blob *in, struct s2n_blob *out);
 int s2n_pkey_match(const struct s2n_pkey *pub_key, const struct s2n_pkey *priv_key);
 int s2n_pkey_free(struct s2n_pkey *pkey);
+int s2n_pkey_set_alt_decrypt(struct s2n_pkey *key, alternate_decrypt decrypt);
 int s2n_pkey_set_alt_sign(struct s2n_pkey *key, alternate_sign sign);
 int s2n_pkey_set_alt_size(struct s2n_pkey *key, alternate_size size);
 

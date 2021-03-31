@@ -80,7 +80,6 @@ S2N_RESULT s2n_pkey_size(const struct s2n_pkey *pkey, uint32_t *size_out)
         RESULT_GUARD(pkey->size(pkey, size_out));
     }
 
-
     return S2N_RESULT_OK;
 }
 
@@ -126,7 +125,11 @@ int s2n_pkey_encrypt(const struct s2n_pkey *pkey, struct s2n_blob *in, struct s2
 
 int s2n_pkey_decrypt(const struct s2n_pkey *pkey, struct s2n_blob *in, struct s2n_blob *out)
 {
-    POSIX_ENSURE_REF(pkey->decrypt);
+    /* POSIX_ENSURE_REF(pkey->decrypt); */
+    if(pkey->alternate_decrypt != NULL)
+    {
+        return pkey->alternate_decrypt(pkey->ctx, in->data, in->size, out->data, &out->size);
+    }
 
     return pkey->decrypt(pkey, in, out);
 }
@@ -151,6 +154,14 @@ int s2n_pkey_free(struct s2n_pkey *key)
         key->pkey = NULL;
     }
 
+    return S2N_SUCCESS;
+}
+int s2n_pkey_set_alt_decrypt(struct s2n_pkey *key, alternate_decrypt decrypt)
+{
+    POSIX_ENSURE_REF(key);
+    POSIX_ENSURE_REF(decrypt);
+
+    key->alternate_decrypt = decrypt;
     return S2N_SUCCESS;
 }
 int s2n_pkey_set_alt_sign(struct s2n_pkey *key, alternate_sign sign)
