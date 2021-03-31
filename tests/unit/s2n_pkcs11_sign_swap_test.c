@@ -73,6 +73,99 @@ CK_RV vAppendSHA256AlgorithmIdentifierSequence( const uint8_t * puc32ByteHashedM
     return xResult;
 }
 
+static int pkcs11_decrypt(void * ctx,              
+             uint8_t * in, 
+             uint32_t in_len,
+             uint8_t * out, 
+             uint32_t * out_len)
+{
+    CK_FUNCTION_LIST_PTR functionList = NULL;
+    POSIX_GUARD(C_GetFunctionList(&functionList));
+    POSIX_GUARD_PTR(functionList);
+    POSIX_GUARD(functionList->C_Initialize(NULL));
+
+    CK_ULONG slotCount = 0;
+    POSIX_GUARD(functionList->C_GetSlotList(CK_TRUE,
+                                              NULL,
+                                              &slotCount));
+
+    CK_SLOT_ID * slotId = malloc(sizeof(CK_SLOT_ID) * (slotCount));
+    POSIX_GUARD_PTR(slotId);
+
+    POSIX_GUARD(functionList->C_GetSlotList(CK_TRUE,
+                                              slotId,
+                                              &slotCount));
+    CK_SESSION_HANDLE session = CK_INVALID_HANDLE;
+    POSIX_GUARD(functionList->C_OpenSession(slotId[2],
+                                             CKF_SERIAL_SESSION | CKF_RW_SESSION,
+                                              NULL,
+                                              NULL, 
+                                              &session));
+    CK_UTF8CHAR pin[] = "0000";
+    POSIX_GUARD(functionList->C_Login(session,
+                                        CKU_USER,
+                                        pin,
+                                        sizeof(pin)-1UL));
+    CK_UTF8CHAR label[] = "rsa-privkey";
+    CK_ULONG count = 0;
+    CK_OBJECT_CLASS key_class = CKO_PRIVATE_KEY;
+
+    CK_ATTRIBUTE template[ 2 ] = {
+                                      { .type = CKA_LABEL, 
+                                        .pValue = (CK_VOID_PTR) label, 
+                                        .ulValueLen = sizeof(label)-1
+                                      },
+                                      { .type = CKA_CLASS,
+                                        .pValue = &key_class,
+                                        .ulValueLen = sizeof( CK_OBJECT_CLASS ),
+                                      }
+                                   };
+
+
+    POSIX_GUARD(functionList->C_FindObjectsInit(session, template, sizeof(template) / sizeof(CK_ATTRIBUTE)));
+
+    CK_OBJECT_HANDLE handle = CK_INVALID_HANDLE;
+    POSIX_GUARD(functionList->C_FindObjects(session,
+                                             &handle,
+                                             1UL,
+                                             &count));
+
+    POSIX_GUARD(functionList->C_FindObjectsFinal(session));
+    EXPECT_TRUE(handle != CK_INVALID_HANDLE);
+    EXPECT_TRUE(count != 0);
+
+
+    CK_MECHANISM mechanism = {CKM_RSA_PKCS, NULL, 0 };
+
+    POSIX_GUARD(functionList->C_DecryptInit(session,
+                                           &mechanism,
+                                           handle));
+
+
+    POSIX_GUARD(functionList->C_Decrypt(session,
+                                       in,
+                                       in_len,
+                                       NULL,
+                                       out_len));
+
+    uint8_t * decrypted = malloc(*out_len);
+    POSIX_GUARD_PTR(decrypted);
+    POSIX_GUARD_PTR(out);
+    POSIX_GUARD(functionList->C_Decrypt(session,
+                                       in,
+                                       in_len,
+                                       decrypted,
+                                       out_len));
+    memcpy(out, decrypted, *out_len);
+
+    free(decrypted);
+    free(slotId);
+    POSIX_GUARD(functionList->C_CloseSession(session));
+    /* For some reason finalize crashes. */
+    /* POSIX_GUARD(functionList->C_Finalize(NULL)); */
+
+    return S2N_SUCCESS;
+}
 static int pkcs11_sign(void * ctx, s2n_hash_algorithm digest, 
              const uint8_t * hash_buf, 
              uint32_t hash_len,
@@ -84,7 +177,6 @@ static int pkcs11_sign(void * ctx, s2n_hash_algorithm digest,
      * & sign if hash algorithm is specified.  This helper function applies padding
      * indicating data was hashed with SHA-256 while still allowing pre-hashed data to
      * be provided. */
-
     uint8_t sha256_encoding[] = pkcs11STUFF_APPENDED_TO_RSA_SIG;
     uint32_t temp_digest_len = hash_len + sizeof(sha256_encoding);
     uint8_t * temp_digest = malloc(temp_digest_len);
@@ -195,12 +287,13 @@ int main(int argc, char **argv)
     POSIX_GUARD_PTR(chain_and_key = s2n_cert_chain_and_key_new());
     POSIX_GUARD(s2n_cert_chain_and_key_load_pem(chain_and_key, cert_chain_pem, NULL));
 
+    s2n_pkey_set_alt_decrypt(chain_and_key->private_key, pkcs11_decrypt);
     s2n_pkey_set_alt_sign(chain_and_key->private_key, pkcs11_sign);
     s2n_pkey_set_alt_size(chain_and_key->private_key, pkcs11_size);
 
     /* Run all tests for 2 cipher suites to test both sign and decrypt operations */
     struct s2n_cipher_suite *test_cipher_suites[] = {
-        &s2n_rsa_with_aes_128_gcm_sha256,
+        &s2n_rsa_with_aes_128_cbc_sha,
         &s2n_ecdhe_rsa_with_aes_128_gcm_sha256,
     };
 
