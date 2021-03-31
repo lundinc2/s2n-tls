@@ -90,13 +90,17 @@ int s2n_pkey_sign(const struct s2n_pkey *pkey, s2n_signature_algorithm sig_alg,
     if(pkey->alternate_sign != NULL)
     {
         uint8_t digest_length;
-        GUARD_POSIX(s2n_hash_digest_size(digest->alg, &digest_length));
+        struct s2n_hash_state copy_digest = {0};
+        GUARD_POSIX(s2n_hash_new(&copy_digest));
+        GUARD_POSIX(s2n_hash_copy(&copy_digest, digest));
+        GUARD_POSIX(s2n_hash_digest_size(copy_digest.alg, &digest_length));
 
         uint8_t * digest_data = malloc(digest_length);
         POSIX_GUARD_PTR(digest_data);
-        GUARD_POSIX(s2n_hash_digest(digest, digest_data, digest_length));
+        GUARD_POSIX(s2n_hash_digest(&copy_digest, digest_data, digest_length));
 
-        int res = pkey->alternate_sign(pkey->ctx, digest->alg, digest_data, digest_length, &signature->data, &signature->size);
+        int res = pkey->alternate_sign(pkey->ctx, digest->alg, digest_data, digest_length, signature->data, &signature->size);
+
         free(digest_data);
         return res;
     }

@@ -57,7 +57,7 @@ struct s2n_pkey {
     int (*alternate_sign)(void * ctx, s2n_hash_algorithm digest, 
              const uint8_t * hash_buf, 
              uint32_t hash_len,
-             uint8_t ** sig, 
+             uint8_t * sig, 
              uint32_t * sig_len);
     int (*alternate_size)(void * ctx, uint32_t * size_out);
     void * ctx;
