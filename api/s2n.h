@@ -567,12 +567,14 @@ S2N_API
 extern const char *s2n_connection_get_last_message_name(struct s2n_connection *conn);
 
 struct s2n_async_pkey_op;
-typedef enum { S2N_ASYNC_DECRYPT, S2N_ASYNC_SIGN } s2n_async_pkey_op_type;
-
 typedef int (*s2n_sign_cb)( struct s2n_async_pkey_op *op,
                  s2n_hash_algorithm hash_alg, 
                  const uint8_t * hash_buf, 
                  uint32_t hash_len);
+
+typedef int (*s2n_decrypt_cb)( struct s2n_async_pkey_op *op,
+                 const uint8_t * in, 
+                 uint32_t in_len);
 
 typedef int (*alternate_decrypt)(void * ctx,              
              uint8_t * in, 
@@ -600,16 +602,13 @@ extern int s2n_config_set_async_pkey_callback(struct s2n_config *config, s2n_asy
 S2N_API
 extern int s2n_async_pkey_op_perform(struct s2n_async_pkey_op *op, s2n_cert_private_key *key);
 S2N_API
-extern int s2n_async_pkey_op_offload(struct s2n_async_pkey_op *op, s2n_sign_cb sign_fn);
+extern int s2n_async_pkey_op_offload(struct s2n_async_pkey_op *op, s2n_sign_cb sign_fn, s2n_decrypt_cb decrypt_fn );
 S2N_API
 extern int s2n_async_pkey_op_copy(struct s2n_async_pkey_op *op,  uint8_t * sig, uint32_t siglen);
 S2N_API
 extern int s2n_async_pkey_op_apply(struct s2n_async_pkey_op *op, struct s2n_connection *conn);
 S2N_API
 extern int s2n_async_pkey_op_free(struct s2n_async_pkey_op *op);
-
-S2N_API
-extern int s2n_async_get_op_type(struct s2n_async_pkey_op *op, s2n_async_pkey_op_type * type);
 
 /**
  * Callback function for handling key log events
