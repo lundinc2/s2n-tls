@@ -194,7 +194,7 @@ set(CMAKE_C_FLAGS_DEBUGOPT "")
 
 target_compile_options(${PROJECT_NAME} PRIVATE -pedantic -std=gnu99 -Wall -Werror -Wimplicit -Wunused -Wcomment -Wchar-subscripts
         -Wuninitialized -Wshadow -Wcast-qual -Wcast-align -Wwrite-strings -Wno-deprecated-declarations -Wno-unknown-pragmas -Wformat-security
-        -Wno-missing-braces -fvisibility=hidden -DS2N_EXPORTS)
+        -Wno-missing-braces -DS2N_EXPORTS)
 
 if(S2N_NO_PQ)
     target_compile_options(${PROJECT_NAME} PUBLIC -DS2N_NO_PQ)
@@ -250,6 +250,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC $<BUILD_INTERFACE:${CMAKE_CURR
 target_include_directories(${PROJECT_NAME} PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/api> $<INSTALL_INTERFACE:include>)
 
 target_include_directories(${PROJECT_NAME} PRIVATE $<TARGET_PROPERTY:LibCrypto::Crypto,INTERFACE_INCLUDE_DIRECTORIES>)
+target_include_directories(${PROJECT_NAME} PRIVATE "${CMAKE_CURRENT_LIST_DIR}/pkcs11")
 
 include(CTest)
 if (BUILD_TESTING)
@@ -276,7 +277,9 @@ if (BUILD_TESTING)
         target_include_directories(${test_case_name} PRIVATE api)
         target_include_directories(${test_case_name} PRIVATE ./)
         target_include_directories(${test_case_name} PRIVATE tests)
+        target_include_directories(${test_case_name} PRIVATE "${CMAKE_CURRENT_LIST_DIR}/pkcs11")
         target_link_libraries(${test_case_name} PRIVATE testss2n)
+        target_link_libraries(${test_case_name} PUBLIC "/usr/local/lib/softhsm/libsofthsm2.so")
         target_compile_options(${test_case_name} PRIVATE -Wno-implicit-function-declaration -Wno-deprecated -D_POSIX_C_SOURCE=200809L -std=gnu99)
         add_test(NAME ${test_case_name} COMMAND $<TARGET_FILE:${test_case_name}> WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests/unit)
 
@@ -296,6 +299,8 @@ if (BUILD_TESTING)
 
     add_executable(s2nc "bin/s2nc.c" "bin/echo.c" "bin/https.c" "bin/common.c")
     target_link_libraries(s2nc ${PROJECT_NAME})
+    target_link_libraries(s2nc -L"libsofthsm2.a")
+    target_include_directories(s2nc PRIVATE "${CMAKE_CURRENT_LIST_DIR}/pkcs11")
     target_include_directories(s2nc PRIVATE $<TARGET_PROPERTY:LibCrypto::Crypto,INTERFACE_INCLUDE_DIRECTORIES>)
     target_include_directories(s2nc PRIVATE api)
     target_compile_options(s2nc PRIVATE -std=gnu99 -D_POSIX_C_SOURCE=200112L)
@@ -320,7 +325,7 @@ if (BUILD_TESTING)
             # Based off the flags in tests/benchmark/Makefile
             target_compile_options(${benchmark_name} PRIVATE -pedantic -Wall -Werror -Wunused -Wcomment -Wchar-subscripts
                     -Wuninitialized -Wshadow -Wcast-qual -Wcast-align -Wwrite-strings -Wno-deprecated-declarations
-                    -Wno-unknown-pragmas -Wformat-security -Wno-missing-braces -fvisibility=hidden -Wno-unreachable-code
+                    -Wno-unknown-pragmas -Wformat-security -Wno-missing-braces -Wno-unreachable-code
                     -Wno-unused-but-set-variable)
         endforeach(benchmark)
 
