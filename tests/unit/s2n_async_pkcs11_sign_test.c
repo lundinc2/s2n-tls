@@ -42,8 +42,15 @@
 struct s2n_async_pkey_op *pkey_op = NULL;
 static pthread_mutex_t pkcs11_mutex = {0};
 
+struct host_verify_data {
+    uint8_t callback_invoked;
+    uint8_t allow;
+};
+
 static uint8_t verify_host_fn(const char *host_name, size_t host_name_len, void *data) {
-    return 0;
+    struct host_verify_data *verify_data = (struct host_verify_data *) data;
+    verify_data->callback_invoked = 1;
+    return verify_data->allow;
 }
 
 CK_RV append_sha256_id( const uint8_t * sha256_hash,
@@ -352,8 +359,10 @@ int main(int argc, char **argv)
             EXPECT_SUCCESS(s2n_config_add_dhparams(server_config, dhparams_pem));
             EXPECT_SUCCESS(s2n_config_set_async_pkey_callback(server_config, async_pkey_callback));
             server_config->security_policy = &server_security_policy;
+
             struct host_verify_data verify_data = {.allow = 1, .callback_invoked = 0};
             EXPECT_SUCCESS(s2n_config_set_verify_host_callback(server_config, verify_host_fn, &verify_data));
+            EXPECT_SUCCESS(s2n_config_set_verification_ca_location(server_config, S2N_DEFAULT_TEST_CERT_CHAIN, NULL));
             EXPECT_SUCCESS(s2n_config_set_verification_ca_location(server_config, S2N_DEFAULT_TEST_CERT_CHAIN, NULL));
 
             EXPECT_NOT_NULL(client_config = s2n_config_new());
