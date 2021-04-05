@@ -62,9 +62,13 @@ struct s2n_async_pkey_op;
     return s2n_result_is_ok(s2n_async_pkey_sign(conn, sig_alg, digest, on_complete)) ? S2N_SUCCESS : S2N_FAILURE;
 
 int s2n_async_pkey_op_perform(struct s2n_async_pkey_op *op, s2n_cert_private_key *key);
-int s2n_async_pkey_op_offload(struct s2n_async_pkey_op *op, s2n_sign_cb sign_fn, s2n_decrypt_cb decrypt_fn);
 int s2n_async_pkey_op_apply(struct s2n_async_pkey_op *op, struct s2n_connection *conn);
 int s2n_async_pkey_op_free(struct s2n_async_pkey_op *op);
+
+int s2n_async_get_op_type(struct s2n_async_pkey_op *op, s2n_async_pkey_op_type * type);
+int s2n_async_pkey_op_get_input_size(struct s2n_async_pkey_op *op, uint32_t * data_len );
+int s2n_async_pkey_op_get_input(struct s2n_async_pkey_op *op, uint8_t * data, uint32_t data_len );
+int s2n_async_pkey_copy_output(struct s2n_async_pkey_op *op, uint8_t * data, uint32_t data_len);
 
 S2N_RESULT s2n_async_pkey_decrypt(struct s2n_connection *conn, struct s2n_blob *encrypted, struct s2n_blob *init_decrypted,
                            s2n_async_pkey_decrypt_complete on_complete);
