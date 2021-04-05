@@ -36,6 +36,7 @@
 
 /* Used to add SHA256 ASN1 encoding to the PKCS #11 RSA signature. */
 #define pkcs11STUFF_APPENDED_TO_RSA_SIG    { 0x30, 0x31, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01, 0x05, 0x00, 0x04, 0x20 }
+#define pkcs11_test_slot 2
 #define pkcs11_pin "0000"
 #define pkcs11_key_label "rsa-privkey"
 
@@ -60,7 +61,7 @@ static uint8_t verify_host_fn(const char *host_name, size_t host_name_len, void 
     return verify_data->allow;
 }
 
-CK_RV append_sha256_id( const uint8_t * sha256_hash,
+static int append_sha256_id( const uint8_t * sha256_hash,
                                                 uint8_t * hash_oid_buf )
 {
     POSIX_GUARD_PTR(sha256_hash);
@@ -71,7 +72,7 @@ CK_RV append_sha256_id( const uint8_t * sha256_hash,
     ( void ) memcpy( hash_oid_buf, oid_sequence, sizeof( oid_sequence ) );
     ( void ) memcpy( &hash_oid_buf[ sizeof( oid_sequence ) ], sha256_hash, 32 );
 
-    return CKR_OK;
+    return S2N_SUCCESS;
 }
 
 static int pkcs11_init()
@@ -101,15 +102,16 @@ static int pkcs11_setup_session(CK_SESSION_HANDLE_PTR session)
     POSIX_GUARD(function_list->C_GetSlotList(CK_TRUE,
                                               slotId,
                                               &slotCount));
-    POSIX_GUARD(function_list->C_OpenSession(slotId[2],
+    POSIX_GUARD(function_list->C_OpenSession(pkcs11_test_slot,
                                              CKF_SERIAL_SESSION | CKF_RW_SESSION,
-                                              NULL,
-                                              NULL, 
-                                              session));
+                                             NULL,
+                                             NULL, 
+                                             session));
     free(slotId);
 
     return S2N_SUCCESS;
 }
+
 static int pkcs11_login(CK_SESSION_HANDLE session, CK_UTF8CHAR * pin, CK_ULONG pin_size)
 {
     CK_FUNCTION_LIST_PTR function_list = NULL;
@@ -289,11 +291,11 @@ void * pkey_task(void * params)
 
     struct s2n_connection *conn = info->conn;
     struct s2n_async_pkey_op *op = info->op;
+
     uint32_t input_len;
     s2n_async_pkey_op_get_input_size(op, &input_len );
     uint8_t * input = malloc(input_len);
 
-    
     s2n_async_pkey_op_get_input(op, input,input_len );
 
     uint8_t * output = NULL;
