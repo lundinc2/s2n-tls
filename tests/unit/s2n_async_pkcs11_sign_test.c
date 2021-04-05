@@ -36,11 +36,18 @@
 
 /* Used to add SHA256 ASN1 encoding to the PKCS #11 RSA signature. */
 #define pkcs11STUFF_APPENDED_TO_RSA_SIG    { 0x30, 0x31, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01, 0x05, 0x00, 0x04, 0x20 }
+#define pkcs11_pin "0000"
+#define pkcs11_key_label "rsa-privkey"
 
 #include "pkcs11.h"
 
 struct s2n_async_pkey_op *pkey_op = NULL;
 static pthread_mutex_t pkcs11_mutex = {0};
+
+struct task_params {
+    struct s2n_connection *conn;
+    struct s2n_async_pkey_op *op;
+};
 
 struct host_verify_data {
     uint8_t callback_invoked;
@@ -67,93 +74,158 @@ CK_RV append_sha256_id( const uint8_t * sha256_hash,
     return CKR_OK;
 }
 
-static int pkcs11_decrypt(const uint8_t * in, 
-                 uint32_t in_len,
-                 uint8_t ** out_buf, 
-                 uint32_t * out_len)
+static int pkcs11_init()
 {
-    CK_FUNCTION_LIST_PTR functionList = NULL;
-    POSIX_GUARD(C_GetFunctionList(&functionList));
-    POSIX_GUARD_PTR(functionList);
-    POSIX_GUARD(functionList->C_Initialize(NULL));
+    CK_FUNCTION_LIST_PTR function_list = NULL;
+    POSIX_GUARD(C_GetFunctionList(&function_list));
+    POSIX_GUARD_PTR(function_list);
+    POSIX_GUARD(function_list->C_Initialize(NULL));
+
+    return S2N_SUCCESS;
+}
+
+static int pkcs11_setup_session(CK_SESSION_HANDLE_PTR session)
+{
+    CK_FUNCTION_LIST_PTR function_list = NULL;
+    POSIX_GUARD(C_GetFunctionList(&function_list));
+    POSIX_GUARD_PTR(function_list);
 
     CK_ULONG slotCount = 0;
-    POSIX_GUARD(functionList->C_GetSlotList(CK_TRUE,
+    POSIX_GUARD(function_list->C_GetSlotList(CK_TRUE,
                                               NULL,
                                               &slotCount));
 
     CK_SLOT_ID * slotId = malloc(sizeof(CK_SLOT_ID) * (slotCount));
     POSIX_GUARD_PTR(slotId);
 
-    POSIX_GUARD(functionList->C_GetSlotList(CK_TRUE,
+    POSIX_GUARD(function_list->C_GetSlotList(CK_TRUE,
                                               slotId,
                                               &slotCount));
-    CK_SESSION_HANDLE session = CK_INVALID_HANDLE;
-    POSIX_GUARD(functionList->C_OpenSession(slotId[2],
+    POSIX_GUARD(function_list->C_OpenSession(slotId[2],
                                              CKF_SERIAL_SESSION | CKF_RW_SESSION,
                                               NULL,
                                               NULL, 
-                                              &session));
-    CK_UTF8CHAR pin[] = "0000";
-    POSIX_GUARD(functionList->C_Login(session,
+                                              session));
+    free(slotId);
+
+    return S2N_SUCCESS;
+}
+static int pkcs11_login(CK_SESSION_HANDLE session, CK_UTF8CHAR * pin, CK_ULONG pin_size)
+{
+    CK_FUNCTION_LIST_PTR function_list = NULL;
+    POSIX_GUARD(C_GetFunctionList(&function_list));
+    POSIX_GUARD_PTR(function_list);
+
+    POSIX_GUARD(function_list->C_Login(session,
                                         CKU_USER,
                                         pin,
-                                        sizeof(pin)-1UL));
-    CK_UTF8CHAR label[] = "rsa-privkey";
+                                        pin_size));
+    return S2N_SUCCESS;
+}
+
+static int pkcs11_find_key(CK_SESSION_HANDLE session, const char * label, CK_ULONG label_size, CK_OBJECT_HANDLE_PTR key)
+{
+    CK_FUNCTION_LIST_PTR function_list = NULL;
+    POSIX_GUARD(C_GetFunctionList(&function_list));
+    POSIX_GUARD_PTR(function_list);
+
     CK_ULONG count = 0;
     CK_OBJECT_CLASS key_class = CKO_PRIVATE_KEY;
 
-    CK_ATTRIBUTE template[ 2 ] = {
-                                      { .type = CKA_LABEL, 
-                                        .pValue = (CK_VOID_PTR) label, 
-                                        .ulValueLen = sizeof(label)-1
-                                      },
-                                      { .type = CKA_CLASS,
-                                        .pValue = &key_class,
-                                        .ulValueLen = sizeof( CK_OBJECT_CLASS ),
-                                      }
-                                   };
+    CK_ATTRIBUTE template[] = {
+        { .type = CKA_LABEL, 
+            .pValue = (CK_VOID_PTR) label, 
+            .ulValueLen = label_size
+        },
+        { .type = CKA_CLASS,
+            .pValue = &key_class,
+            .ulValueLen = sizeof( CK_OBJECT_CLASS ),
+        }
+    };
 
 
-    POSIX_GUARD(functionList->C_FindObjectsInit(session, template, sizeof(template) / sizeof(CK_ATTRIBUTE)));
+    POSIX_GUARD(function_list->C_FindObjectsInit(session, template, sizeof(template) / sizeof(CK_ATTRIBUTE)));
 
     CK_OBJECT_HANDLE handle = CK_INVALID_HANDLE;
-    POSIX_GUARD(functionList->C_FindObjects(session,
+    POSIX_GUARD(function_list->C_FindObjects(session,
                                              &handle,
                                              1UL,
                                              &count));
 
-    POSIX_GUARD(functionList->C_FindObjectsFinal(session));
+    POSIX_GUARD(function_list->C_FindObjectsFinal(session));
     EXPECT_TRUE(handle != CK_INVALID_HANDLE);
     EXPECT_TRUE(count != 0);
 
+    *key = handle;
 
+    return S2N_SUCCESS;
+}
+
+static int pkcs11_setup(CK_SESSION_HANDLE_PTR session, CK_OBJECT_HANDLE_PTR key)
+{
+    POSIX_GUARD_PTR(session);
+    POSIX_GUARD_PTR(key);
+
+    POSIX_GUARD(pkcs11_init());
+    POSIX_GUARD(pkcs11_setup_session(session));
+    POSIX_GUARD(pkcs11_login(*session, (CK_UTF8CHAR_PTR)pkcs11_pin, sizeof(pkcs11_pin)-1UL));
+    POSIX_GUARD(pkcs11_find_key(*session, pkcs11_key_label, sizeof(pkcs11_key_label)-1UL, key));
+
+    return S2N_SUCCESS;
+}
+
+static int pkcs11_cleanup(CK_SESSION_HANDLE session)
+{
+    CK_FUNCTION_LIST_PTR function_list = NULL;
+    POSIX_GUARD(C_GetFunctionList(&function_list));
+    POSIX_GUARD_PTR(function_list);
+
+    POSIX_GUARD(function_list->C_CloseSession(session));
+    POSIX_GUARD(function_list->C_Finalize(NULL));
+
+    return S2N_SUCCESS;
+}
+
+
+static int pkcs11_decrypt(const uint8_t * in, 
+                 uint32_t in_len,
+                 uint8_t ** out_buf, 
+                 uint32_t * out_len)
+{
+    POSIX_GUARD_PTR(in);
+    POSIX_GUARD_PTR(out_buf);
+    POSIX_GUARD_PTR(out_len);
+
+    CK_FUNCTION_LIST_PTR function_list = NULL;
+    POSIX_GUARD(C_GetFunctionList(&function_list));
+    POSIX_GUARD_PTR(function_list);
+
+    CK_OBJECT_HANDLE handle;
+    CK_SESSION_HANDLE session;
+
+    POSIX_GUARD(pkcs11_setup(&session, &handle));
     CK_MECHANISM mechanism = {CKM_RSA_PKCS, NULL, 0 };
 
-    POSIX_GUARD(functionList->C_DecryptInit(session,
+    POSIX_GUARD(function_list->C_DecryptInit(session,
                                            &mechanism,
                                            handle));
 
 
-    POSIX_GUARD(functionList->C_Decrypt(session,
-                                       in,
+    POSIX_GUARD(function_list->C_Decrypt(session,
+                                       (CK_BYTE_PTR)in,
                                        in_len,
                                        NULL,
-                                       out_len));
+                                       (CK_ULONG_PTR)out_len));
 
     uint8_t * decrypted = malloc(*out_len);
     POSIX_GUARD_PTR(decrypted);
-    POSIX_GUARD(functionList->C_Decrypt(session,
-                                       in,
+    POSIX_GUARD(function_list->C_Decrypt(session,
+                                       (CK_BYTE_PTR)in,
                                        in_len,
                                        decrypted,
-                                       out_len));
+                                       (CK_ULONG_PTR)out_len));
     *out_buf = decrypted;
-
-    free(slotId);
-    POSIX_GUARD(functionList->C_CloseSession(session));
-    /* For some reason finalize crashes. */
-    /* POSIX_GUARD(functionList->C_Finalize(NULL)); */
+    pkcs11_cleanup(session);
 
     return S2N_SUCCESS;
 }
@@ -163,6 +235,10 @@ static int pkcs11_sign(const uint8_t * hash_buf,
                  uint8_t ** sig_buf, 
                  uint32_t * sig_len)
 {
+    POSIX_GUARD_PTR(hash_buf);
+    POSIX_GUARD_PTR(sig_buf);
+    POSIX_GUARD_PTR(sig_len);
+    
     /* OpenSSL expects hashed data without padding, but PKCS #11 C_Sign function performs a hash
      * & sign if hash algorithm is specified.  This helper function applies padding
      * indicating data was hashed with SHA-256 while still allowing pre-hashed data to
@@ -172,102 +248,51 @@ static int pkcs11_sign(const uint8_t * hash_buf,
     uint8_t * temp_digest = malloc(temp_digest_len);
     append_sha256_id( hash_buf, temp_digest );
 
-    CK_FUNCTION_LIST_PTR functionList = NULL;
-    POSIX_GUARD(C_GetFunctionList(&functionList));
-    POSIX_GUARD_PTR(functionList);
-    POSIX_GUARD(functionList->C_Initialize(NULL));
+    CK_FUNCTION_LIST_PTR function_list = NULL;
+    POSIX_GUARD(C_GetFunctionList(&function_list));
+    POSIX_GUARD_PTR(function_list);
 
-    CK_ULONG slotCount = 0;
-    POSIX_GUARD(functionList->C_GetSlotList(CK_TRUE,
-                                              NULL,
-                                              &slotCount));
+    CK_OBJECT_HANDLE handle;
+    CK_SESSION_HANDLE session;
 
-    CK_SLOT_ID * slotId = malloc(sizeof(CK_SLOT_ID) * (slotCount));
-    POSIX_GUARD_PTR(slotId);
-
-    POSIX_GUARD(functionList->C_GetSlotList(CK_TRUE,
-                                              slotId,
-                                              &slotCount));
-    CK_SESSION_HANDLE session = CK_INVALID_HANDLE;
-    POSIX_GUARD(functionList->C_OpenSession(slotId[2],
-                                             CKF_SERIAL_SESSION | CKF_RW_SESSION,
-                                              NULL,
-                                              NULL, 
-                                              &session));
-    CK_UTF8CHAR pin[] = "0000";
-    POSIX_GUARD(functionList->C_Login(session,
-                                        CKU_USER,
-                                        pin,
-                                        sizeof(pin)-1UL));
-    CK_UTF8CHAR label[] = "rsa-privkey";
-    CK_ULONG count = 0;
-    CK_OBJECT_CLASS key_class = CKO_PRIVATE_KEY;
-
-    CK_ATTRIBUTE template[ 2 ] = {
-                                      { .type = CKA_LABEL, 
-                                        .pValue = (CK_VOID_PTR) label, 
-                                        .ulValueLen = sizeof(label)-1
-                                      },
-                                      { .type = CKA_CLASS,
-                                        .pValue = &key_class,
-                                        .ulValueLen = sizeof( CK_OBJECT_CLASS ),
-                                      }
-                                   };
-
-
-    POSIX_GUARD(functionList->C_FindObjectsInit(session, template, sizeof(template) / sizeof(CK_ATTRIBUTE)));
-
-    CK_OBJECT_HANDLE handle = CK_INVALID_HANDLE;
-    POSIX_GUARD(functionList->C_FindObjects(session,
-                                             &handle,
-                                             1UL,
-                                             &count));
-
-    POSIX_GUARD(functionList->C_FindObjectsFinal(session));
-    EXPECT_TRUE(handle != CK_INVALID_HANDLE);
-    EXPECT_TRUE(count != 0);
-
+    POSIX_GUARD(pkcs11_setup(&session, &handle));
 
     CK_MECHANISM mechanism = {CKM_RSA_PKCS, NULL, 0 };
 
-    POSIX_GUARD(functionList->C_SignInit(session,
+    POSIX_GUARD(function_list->C_SignInit(session,
                                            &mechanism,
                                            handle));
 
 
-    POSIX_GUARD(functionList->C_Sign(session,
+    POSIX_GUARD(function_list->C_Sign(session,
                                        temp_digest,
                                        temp_digest_len,
                                        NULL,
-                                       sig_len));
+                                       (CK_ULONG_PTR)sig_len));
 
     uint8_t * sig = malloc(*sig_len);
     POSIX_GUARD_PTR(sig);
-    POSIX_GUARD(functionList->C_Sign(session,
+    POSIX_GUARD(function_list->C_Sign(session,
                                        temp_digest,
                                        temp_digest_len,
                                        sig,
-                                       sig_len));
+                                       (CK_ULONG_PTR)sig_len));
    *sig_buf = sig;
-
-    POSIX_GUARD(functionList->C_CloseSession(session));
-    //POSIX_GUARD(functionList->C_Finalize(NULL));
+    pkcs11_cleanup(session);
 
     return 0;
 }
-struct task_params {
-    struct s2n_connection *conn;
-    struct s2n_async_pkey_op *op;
-}task_params;
 
 void * pkey_task(void * params)
 {
     struct task_params * info = (struct task_params *) params;
+
     struct s2n_connection *conn = info->conn;
     struct s2n_async_pkey_op *op = info->op;
     uint32_t input_len;
     s2n_async_pkey_op_get_input_size(op, &input_len );
     uint8_t * input = malloc(input_len);
+
     
     s2n_async_pkey_op_get_input(op, input,input_len );
 
@@ -276,7 +301,6 @@ void * pkey_task(void * params)
 
     s2n_async_pkey_op_type type;
     s2n_async_get_op_type(op, &type);
-
     
     pthread_mutex_lock(&pkcs11_mutex);
     if(type == S2N_ASYNC_DECRYPT)
@@ -300,12 +324,12 @@ void * pkey_task(void * params)
 
 int async_pkey_callback(struct s2n_connection *conn, struct s2n_async_pkey_op *op)
 {
-    /* Check that we have op */
     EXPECT_NOT_NULL(op);
     pthread_t worker;
     struct task_params * params = malloc(sizeof(struct task_params));
     params->conn = conn; 
     params->op = op; 
+
     POSIX_GUARD(pthread_create(&worker, NULL, &pkey_task, params));
 
     return S2N_SUCCESS;
