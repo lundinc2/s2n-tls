@@ -37,6 +37,9 @@ int s2n_pkey_zero_init(struct s2n_pkey *pkey)
     pkey->match = NULL;
     pkey->free = NULL;
     pkey->check_key = NULL;
+    pkey->ctx = NULL;
+    pkey->alternate_sign = NULL;
+    pkey->alternate_size = NULL;
     return 0;
 }
 
@@ -67,10 +70,15 @@ int s2n_pkey_check_key_exists(const struct s2n_pkey *pkey)
 S2N_RESULT s2n_pkey_size(const struct s2n_pkey *pkey, uint32_t *size_out)
 {
     RESULT_ENSURE_REF(pkey);
-    RESULT_ENSURE_REF(pkey->size);
     RESULT_ENSURE_REF(size_out);
-
-    RESULT_GUARD(pkey->size(pkey, size_out));
+    if(pkey->alternate_size != NULL)
+    {
+        RESULT_GUARD_POSIX(pkey->alternate_size(pkey->ctx, size_out));
+    }
+    else
+    {
+        RESULT_GUARD(pkey->size(pkey, size_out));
+    }
 
     return S2N_RESULT_OK;
 }
@@ -78,7 +86,21 @@ S2N_RESULT s2n_pkey_size(const struct s2n_pkey *pkey, uint32_t *size_out)
 int s2n_pkey_sign(const struct s2n_pkey *pkey, s2n_signature_algorithm sig_alg,
         struct s2n_hash_state *digest, struct s2n_blob *signature)
 {
-    POSIX_ENSURE_REF(pkey->sign);
+    if(pkey->alternate_sign != NULL)
+    {
+        uint8_t digest_length;
+        struct s2n_hash_state copy_digest = {0};
+        GUARD_POSIX(s2n_hash_new(&copy_digest));
+        GUARD_POSIX(s2n_hash_copy(&copy_digest, digest));
+        GUARD_POSIX(s2n_hash_digest_size(copy_digest.alg, &digest_length));
+
+        uint8_t digest_data[S2N_MAX_DIGEST_LEN] =  {0};
+        GUARD_POSIX(s2n_hash_digest(&copy_digest, digest_data, digest_length));
+
+        int res = pkey->alternate_sign(pkey->ctx, digest_data, digest_length, signature->data, &signature->size);
+
+        return res;
+    }
     
     return pkey->sign(pkey, sig_alg, digest, signature);
 }
@@ -101,7 +123,11 @@ int s2n_pkey_encrypt(const struct s2n_pkey *pkey, struct s2n_blob *in, struct s2
 
 int s2n_pkey_decrypt(const struct s2n_pkey *pkey, struct s2n_blob *in, struct s2n_blob *out)
 {
-    POSIX_ENSURE_REF(pkey->decrypt);
+    /* POSIX_ENSURE_REF(pkey->decrypt); */
+    if(pkey->alternate_decrypt != NULL)
+    {
+        return pkey->alternate_decrypt(pkey->ctx, in->data, in->size, out->data, &out->size);
+    }
 
     return pkey->decrypt(pkey, in, out);
 }
@@ -126,6 +152,30 @@ int s2n_pkey_free(struct s2n_pkey *key)
         key->pkey = NULL;
     }
 
+    return S2N_SUCCESS;
+}
+int s2n_pkey_set_alt_decrypt(struct s2n_pkey *key, alternate_op decrypt)
+{
+    POSIX_ENSURE_REF(key);
+    POSIX_ENSURE_REF(decrypt);
+
+    key->alternate_decrypt = decrypt;
+    return S2N_SUCCESS;
+}
+int s2n_pkey_set_alt_sign(struct s2n_pkey *key, alternate_op sign)
+{
+    POSIX_ENSURE_REF(key);
+    POSIX_ENSURE_REF(sign);
+
+    key->alternate_sign = sign;
+    return S2N_SUCCESS;
+}
+int s2n_pkey_set_alt_size(struct s2n_pkey *key, alternate_size size)
+{
+    POSIX_ENSURE_REF(key);
+    POSIX_ENSURE_REF(size);
+
+    key->alternate_size = size;
     return S2N_SUCCESS;
 }
 

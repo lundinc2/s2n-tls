@@ -554,11 +554,31 @@ extern const char *s2n_connection_get_last_message_name(struct s2n_connection *c
 
 struct s2n_async_pkey_op;
 
+typedef int (*alternate_op)(void * ctx,              
+             const uint8_t * in, 
+             uint32_t in_len,
+             uint8_t * out, 
+             uint32_t * out_len);
+
+typedef int (*alternate_size)(void * ctx, uint32_t * size_out);
+
+S2N_API
+extern int s2n_pkey_set_ctx(struct s2n_pkey *key, void * ctx);
+S2N_API
+extern int s2n_pkey_set_alt_decrypt(struct s2n_pkey *key, alternate_op decrypt);
+S2N_API
+extern int s2n_pkey_set_alt_sign(struct s2n_pkey *key, alternate_op sign);
+S2N_API
+extern int s2n_pkey_set_alt_size(struct s2n_pkey *key, alternate_size size);
+
 typedef int (*s2n_async_pkey_fn)(struct s2n_connection *conn, struct s2n_async_pkey_op *op);
 S2N_API
 extern int s2n_config_set_async_pkey_callback(struct s2n_config *config, s2n_async_pkey_fn fn);
 S2N_API
 extern int s2n_async_pkey_op_perform(struct s2n_async_pkey_op *op, s2n_cert_private_key *key);
+S2N_API
+S2N_API
+extern int s2n_async_pkey_op_copy(struct s2n_async_pkey_op *op,  uint8_t * data, uint32_t data_len);
 S2N_API
 extern int s2n_async_pkey_op_apply(struct s2n_async_pkey_op *op, struct s2n_connection *conn);
 S2N_API
