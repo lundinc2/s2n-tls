@@ -485,6 +485,33 @@ int s2n_config_set_async_pkey_callback(struct s2n_config *config, s2n_async_pkey
     return S2N_SUCCESS;
 }
 
+int s2n_async_pkey_set_decrypt_callback(struct s2n_config *config, s2n_pkey_decrypt_fn fn)
+{
+    POSIX_ENSURE_REF(config);
+
+    config->decryt_pkey_cb = fn;
+
+    return S2N_SUCCESS;
+}
+
+int s2n_async_pkey_set_sign_callback(struct s2n_config *config, s2n_pkey_sign_fn fn)
+{
+    POSIX_ENSURE_REF(config);
+
+    config->sign_pkey_cb = fn;
+
+    return S2N_SUCCESS;
+}
+
+int s2n_async_pkey_set_deferred_cleanup_callback(struct s2n_config *config, s2n_pkey_deferred_cleanup_fn fn)
+{
+    POSIX_ENSURE_REF(config);
+
+    config->cleanup_cb = fn;
+
+    return S2N_SUCCESS;
+}
+
 int s2n_config_clear_default_certificates(struct s2n_config *config)
 {
     POSIX_ENSURE_REF(config);

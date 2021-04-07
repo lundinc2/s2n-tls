@@ -188,16 +188,22 @@ static int pkcs11_cleanup(CK_SESSION_HANDLE session)
     return S2N_SUCCESS;
 }
 
+static void cleanup_helper(uint8_t * ctx)
+{
+    free(ctx);
+}
 
-static int pkcs11_decrypt(const uint8_t * in, 
+
+static int pkcs11_decrypt(struct s2n_connection *conn,
+                 const uint8_t * in, 
                  uint32_t in_len,
-                 uint8_t ** out_buf, 
+                 uint8_t ** out, 
                  uint32_t * out_len)
 {
+    POSIX_GUARD_PTR(conn);
     POSIX_GUARD_PTR(in);
-    POSIX_GUARD_PTR(out_buf);
-    POSIX_GUARD_PTR(out_len);
 
+    pthread_mutex_lock(&pkcs11_mutex);
     CK_FUNCTION_LIST_PTR function_list = NULL;
     POSIX_GUARD(C_GetFunctionList(&function_list));
     POSIX_GUARD_PTR(function_list);
@@ -212,7 +218,6 @@ static int pkcs11_decrypt(const uint8_t * in,
                                            &mechanism,
                                            handle));
 
-
     POSIX_GUARD(function_list->C_Decrypt(session,
                                        (CK_BYTE_PTR)in,
                                        in_len,
@@ -226,20 +231,22 @@ static int pkcs11_decrypt(const uint8_t * in,
                                        in_len,
                                        decrypted,
                                        (CK_ULONG_PTR)out_len));
-    *out_buf = decrypted;
+    *out = decrypted;
     pkcs11_cleanup(session);
+    pthread_mutex_unlock(&pkcs11_mutex);
 
     return S2N_SUCCESS;
 }
 
-static int pkcs11_sign(const uint8_t * hash_buf, 
+static int pkcs11_sign(struct s2n_connection *conn,
+                 const uint8_t * hash_buf, 
                  uint32_t hash_len,
-                 uint8_t ** sig_buf, 
-                 uint32_t * sig_len)
+                 uint8_t ** out, 
+                 uint32_t * out_len)
 {
+    POSIX_GUARD_PTR(conn);
     POSIX_GUARD_PTR(hash_buf);
-    POSIX_GUARD_PTR(sig_buf);
-    POSIX_GUARD_PTR(sig_len);
+    pthread_mutex_lock(&pkcs11_mutex);
     
     /* OpenSSL expects hashed data without padding, but PKCS #11 C_Sign function performs a hash
      * & sign if hash algorithm is specified.  This helper function applies padding
@@ -270,17 +277,18 @@ static int pkcs11_sign(const uint8_t * hash_buf,
                                        temp_digest,
                                        temp_digest_len,
                                        NULL,
-                                       (CK_ULONG_PTR)sig_len));
+                                       (CK_ULONG_PTR)out_len));
 
-    uint8_t * sig = malloc(*sig_len);
+    uint8_t * sig = malloc(*out_len);
     POSIX_GUARD_PTR(sig);
     POSIX_GUARD(function_list->C_Sign(session,
                                        temp_digest,
                                        temp_digest_len,
                                        sig,
-                                       (CK_ULONG_PTR)sig_len));
-   *sig_buf = sig;
+                                       (CK_ULONG_PTR)out_len));
+    *out = sig;
     pkcs11_cleanup(session);
+    pthread_mutex_unlock(&pkcs11_mutex);
 
     return 0;
 }
@@ -292,35 +300,16 @@ void * pkey_task(void * params)
     struct s2n_connection *conn = info->conn;
     struct s2n_async_pkey_op *op = info->op;
 
-    uint32_t input_len;
-    s2n_async_pkey_op_get_input_size(op, &input_len );
-    uint8_t * input = malloc(input_len);
+    struct s2n_cert_chain_and_key *chain_and_key = s2n_connection_get_selected_cert(conn);
+    EXPECT_NOT_NULL(chain_and_key);
 
-    s2n_async_pkey_op_get_input(op, input,input_len );
+    s2n_cert_private_key *pkey = s2n_cert_chain_and_key_get_private_key(chain_and_key);
+    EXPECT_NOT_NULL(pkey);
 
-    uint8_t * output = NULL;
-    uint32_t output_len = 0;
-
-    s2n_async_pkey_op_type type;
-    s2n_async_get_op_type(op, &type);
-    
-    pthread_mutex_lock(&pkcs11_mutex);
-    if(type == S2N_ASYNC_DECRYPT)
-    {
-        pkcs11_decrypt(input, input_len, &output, &output_len);
-    }
-    else
-    {
-        pkcs11_sign(input, input_len, &output, &output_len);
-    }
-    pthread_mutex_unlock(&pkcs11_mutex);
-
-    s2n_async_pkey_copy_output(op, output, output_len );
-    free(output);
-
+    s2n_async_pkey_op_perform(op, pkey);
     s2n_async_pkey_op_apply(op, conn);
     
-    free(params);
+    free(info);
     pthread_exit(NULL);
 }
 
@@ -383,7 +372,10 @@ int main(int argc, char **argv)
             EXPECT_NOT_NULL(server_config = s2n_config_new());
             EXPECT_SUCCESS(s2n_config_add_cert_chain_and_key_to_store(server_config, chain_and_key));
             EXPECT_SUCCESS(s2n_config_add_dhparams(server_config, dhparams_pem));
-            EXPECT_SUCCESS(s2n_config_set_async_pkey_callback(server_config, async_pkey_callback));
+            //EXPECT_SUCCESS(s2n_config_set_async_pkey_callback(server_config, async_pkey_callback));
+            EXPECT_SUCCESS(s2n_async_pkey_set_decrypt_callback(server_config, pkcs11_decrypt));
+            EXPECT_SUCCESS(s2n_async_pkey_set_sign_callback(server_config, pkcs11_sign));
+            EXPECT_SUCCESS(s2n_async_pkey_set_deferred_cleanup_callback(server_config, cleanup_helper));
             server_config->security_policy = &server_security_policy;
 
             struct host_verify_data verify_data = {.allow = 1, .callback_invoked = 0};
@@ -393,7 +385,10 @@ int main(int argc, char **argv)
 
             EXPECT_NOT_NULL(client_config = s2n_config_new());
             EXPECT_SUCCESS(s2n_config_add_cert_chain_and_key_to_store(client_config, chain_and_key));
-            EXPECT_SUCCESS(s2n_config_set_async_pkey_callback(client_config, async_pkey_callback));
+            //EXPECT_SUCCESS(s2n_config_set_async_pkey_callback(client_config, async_pkey_callback));
+            EXPECT_SUCCESS(s2n_async_pkey_set_decrypt_callback(client_config, pkcs11_decrypt));
+            EXPECT_SUCCESS(s2n_async_pkey_set_sign_callback(client_config, pkcs11_sign));
+            EXPECT_SUCCESS(s2n_async_pkey_set_deferred_cleanup_callback(client_config, cleanup_helper));
             EXPECT_SUCCESS(s2n_config_set_verify_host_callback(client_config, verify_host_fn, &verify_data));
             EXPECT_SUCCESS(s2n_config_set_verification_ca_location(client_config, S2N_DEFAULT_TEST_CERT_CHAIN, NULL));
 

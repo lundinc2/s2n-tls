@@ -25,6 +25,8 @@
 #include "utils/s2n_result.h"
 #include "utils/s2n_safety.h"
 
+typedef enum { S2N_ASYNC_DECRYPT, S2N_ASYNC_SIGN } s2n_async_pkey_op_type;
+
 struct s2n_async_pkey_decrypt_data {
     s2n_async_pkey_decrypt_complete on_complete;
     struct s2n_blob                 encrypted;
@@ -189,8 +191,28 @@ S2N_RESULT s2n_async_pkey_decrypt_sync(struct s2n_connection *conn, struct s2n_b
     RESULT_ENSURE_REF(on_complete);
 
     const struct s2n_pkey *pkey = conn->handshake_params.our_chain_and_key->private_key;
+    bool rsa_failed = true;
+    s2n_pkey_decrypt_fn alt_decrypt = conn->config->decryt_pkey_cb;
 
-    bool rsa_failed = s2n_pkey_decrypt(pkey, encrypted, init_decrypted) != S2N_SUCCESS;
+    if(alt_decrypt == NULL)
+    {
+        rsa_failed = s2n_pkey_decrypt(pkey, encrypted, init_decrypted) != S2N_SUCCESS;
+    }
+    else
+    {
+        uint8_t * out;
+        uint32_t out_len;
+        rsa_failed = alt_decrypt(conn, encrypted->data, encrypted->size, &out, &out_len);
+
+        RESULT_ENSURE_REF(out);
+        s2n_blob_init(init_decrypted, out, out_len);
+
+        if(conn->config->cleanup_cb != NULL)
+        {
+            conn->config->cleanup_cb(out);
+        }
+    }
+
     RESULT_GUARD_POSIX(on_complete(conn, rsa_failed, init_decrypted));
 
     return S2N_RESULT_OK;
@@ -259,12 +281,36 @@ S2N_RESULT s2n_async_pkey_sign_sync(struct s2n_connection *conn, s2n_signature_a
 
     const struct s2n_pkey *pkey = conn->handshake_params.our_chain_and_key->private_key;
     DEFER_CLEANUP(struct s2n_blob signed_content = { 0 }, s2n_free);
+    s2n_pkey_sign_fn alt_sign = conn->config->sign_pkey_cb;
 
-    uint32_t maximum_signature_length = 0;
-    RESULT_GUARD(s2n_pkey_size(pkey, &maximum_signature_length));
-    RESULT_GUARD_POSIX(s2n_alloc(&signed_content, maximum_signature_length));
+    if(alt_sign==NULL)
+    {
+        uint32_t maximum_signature_length = 0;
+        RESULT_GUARD(s2n_pkey_size(pkey, &maximum_signature_length));
+        RESULT_GUARD_POSIX(s2n_alloc(&signed_content, maximum_signature_length));
 
-    RESULT_GUARD_POSIX(s2n_pkey_sign(pkey, sig_alg, digest, &signed_content));
+        RESULT_GUARD_POSIX(s2n_pkey_sign(pkey, sig_alg, digest, &signed_content));
+    }
+    else
+    {
+        uint8_t digest_length;
+        uint8_t digest_data[S2N_MAX_DIGEST_LEN];
+
+        uint8_t * out;
+        uint32_t out_len;
+
+        RESULT_GUARD_POSIX(s2n_hash_digest_size(digest->alg, &digest_length));
+        RESULT_GUARD_POSIX(s2n_hash_digest(digest, digest_data, digest_length));
+        RESULT_GUARD_POSIX(alt_sign(conn, digest_data, digest_length, &out, &out_len));
+
+        RESULT_ENSURE_REF(out);
+        s2n_blob_init(&signed_content, out, out_len);
+        if(conn->config->cleanup_cb != NULL)
+        {
+            conn->config->cleanup_cb(out);
+        }
+    }
+
 
     RESULT_GUARD_POSIX(on_complete(conn, &signed_content));
 
@@ -338,8 +384,29 @@ S2N_RESULT s2n_async_pkey_decrypt_perform(struct s2n_async_pkey_op *op, s2n_cert
     RESULT_ENSURE_REF(pkey);
 
     struct s2n_async_pkey_decrypt_data *decrypt = &op->op.decrypt;
+    s2n_pkey_decrypt_fn alt_decrypt = op->conn->config->decryt_pkey_cb;
 
-    decrypt->rsa_failed = s2n_pkey_decrypt(pkey, &decrypt->encrypted, &decrypt->decrypted) != S2N_SUCCESS;
+    if(alt_decrypt==NULL)
+    {
+        decrypt->rsa_failed = s2n_pkey_decrypt(pkey, &decrypt->encrypted, &decrypt->decrypted) != S2N_SUCCESS;
+    }
+    else
+    {
+        struct s2n_blob * in = &decrypt->encrypted;
+
+        uint8_t * out;
+        uint32_t out_len;
+        decrypt->rsa_failed = alt_decrypt(op->conn, in->data, in->size, &out, &out_len);
+
+        struct s2n_blob *sig = &decrypt->decrypted;
+        s2n_alloc(sig, out_len);
+        CHECKED_MEMCPY(sig->data, out, out_len);
+
+        if(op->conn->config->cleanup_cb != NULL)
+        {
+            op->conn->config->cleanup_cb(out);
+        }
+    }
 
     return S2N_RESULT_OK;
 }
@@ -376,12 +443,36 @@ S2N_RESULT s2n_async_pkey_sign_perform(struct s2n_async_pkey_op *op, s2n_cert_pr
     RESULT_ENSURE_REF(pkey);
 
     struct s2n_async_pkey_sign_data *sign = &op->op.sign;
+    s2n_pkey_sign_fn alt_sign = op->conn->config->sign_pkey_cb;
 
-    uint32_t maximum_signature_length = 0;
-    RESULT_GUARD(s2n_pkey_size(pkey, &maximum_signature_length));
-    RESULT_GUARD_POSIX(s2n_alloc(&sign->signature, maximum_signature_length));
+    if(alt_sign != NULL)
+    {
+        uint8_t digest_length;
+        uint8_t digest_data[S2N_MAX_DIGEST_LEN];
+        RESULT_GUARD_POSIX(s2n_hash_digest_size(sign->digest.alg, &digest_length));
+        RESULT_GUARD_POSIX(s2n_hash_digest(&sign->digest, digest_data, digest_length));
 
-    RESULT_GUARD_POSIX(s2n_pkey_sign(pkey, sign->sig_alg, &sign->digest, &sign->signature));
+        uint8_t * out;
+        uint32_t out_len;
+        RESULT_GUARD_POSIX(alt_sign(op->conn, digest_data, digest_length, &out, &out_len));
+
+        struct s2n_blob *sig = &sign->signature;
+        s2n_alloc(sig, out_len);
+        CHECKED_MEMCPY(sig->data, out, out_len);
+
+        if(op->conn->config->cleanup_cb != NULL)
+        {
+            op->conn->config->cleanup_cb(out);
+        }
+    }
+    else
+    {
+        uint32_t maximum_signature_length = 0;
+        RESULT_GUARD(s2n_pkey_size(pkey, &maximum_signature_length));
+        RESULT_GUARD_POSIX(s2n_alloc(&sign->signature, maximum_signature_length));
+
+        RESULT_GUARD_POSIX(s2n_pkey_sign(pkey, sign->sig_alg, &sign->digest, &sign->signature));
+    }
 
     return S2N_RESULT_OK;
 }
@@ -408,105 +499,5 @@ S2N_RESULT s2n_async_pkey_sign_free(struct s2n_async_pkey_op *op)
     RESULT_GUARD_POSIX(s2n_free(&sign->signature));
 
     return S2N_RESULT_OK;
-}
-
-int s2n_async_get_op_type(struct s2n_async_pkey_op *op, s2n_async_pkey_op_type * type)
-{
-    POSIX_ENSURE_REF(op);
-    POSIX_ENSURE_REF(type);
-
-    switch (op->type) {
-        case S2N_ASYNC_DECRYPT:
-            *type = S2N_ASYNC_DECRYPT;
-            return S2N_SUCCESS;
-        case S2N_ASYNC_SIGN:
-            *type = S2N_ASYNC_SIGN;
-            return S2N_SUCCESS;
-            /* No default for compiler warnings */
-    }
-
-    return S2N_FAILURE;
-}
-
-int s2n_async_pkey_op_get_input_size(struct s2n_async_pkey_op *op, uint32_t * data_len )
-{
-    POSIX_ENSURE_REF(op);
-    POSIX_ENSURE_REF(data_len);
-
-    if(op->type == S2N_ASYNC_DECRYPT)
-    {
-        struct s2n_async_pkey_decrypt_data *decrypt = &op->op.decrypt;
-        struct s2n_blob *in = &decrypt->encrypted;
-        *data_len = in->size;
-    }
-    else
-    {
-        struct s2n_async_pkey_sign_data *sign = &op->op.sign;
-        struct s2n_hash_state *digest = &sign->digest;
-
-        uint8_t digest_length;
-        GUARD_POSIX(s2n_hash_digest_size(digest->alg, &digest_length));
-
-        *data_len = digest_length;
-    }
-
-    return S2N_SUCCESS;
-}
-
-int s2n_async_pkey_op_get_input(struct s2n_async_pkey_op *op, uint8_t * data, uint32_t data_len )
-{
-    POSIX_ENSURE_REF(op);
-
-    if(op->type == S2N_ASYNC_DECRYPT)
-    {
-        struct s2n_async_pkey_decrypt_data *decrypt = &op->op.decrypt;
-        struct s2n_blob *in = &decrypt->encrypted;
-
-        POSIX_ENSURE_LTE(in->size, data_len);
-        POSIX_CHECKED_MEMCPY(data, in->data, in->size);
-    }
-    else
-    {
-        struct s2n_async_pkey_sign_data *sign = &op->op.sign;
-        struct s2n_hash_state *digest = &sign->digest;
-
-        uint8_t digest_length;
-        uint8_t digest_data[S2N_MAX_DIGEST_LEN];
-
-        GUARD_POSIX(s2n_hash_digest_size(digest->alg, &digest_length));
-        GUARD_POSIX(s2n_hash_digest(digest, digest_data, digest_length));
-
-        POSIX_ENSURE_LTE(digest_length, data_len);
-        POSIX_CHECKED_MEMCPY(data, digest_data, digest_length);
-    }
-
-    return S2N_SUCCESS;
-}
-
-int s2n_async_pkey_copy_output(struct s2n_async_pkey_op *op, uint8_t * data, uint32_t data_len)
-{
-    POSIX_ENSURE_REF(op);
-    POSIX_ENSURE_REF(data);
-    struct s2n_blob *out = NULL;
-
-    if(op->type == S2N_ASYNC_DECRYPT)
-    {
-        struct s2n_async_pkey_decrypt_data *decrypt = &op->op.decrypt;
-        out = &decrypt->decrypted;
-    }
-    else
-    {
-        struct s2n_async_pkey_sign_data *sign = &op->op.sign;
-        out = &sign->signature;
-    }
-
-    POSIX_ENSURE_REF(out);
-    POSIX_GUARD(s2n_alloc(out, data_len));
-    POSIX_CHECKED_MEMCPY(out->data, data, data_len);
-    out->size = data_len;
-
-    op->complete = true;
-
-    return S2N_SUCCESS;
 }
 
