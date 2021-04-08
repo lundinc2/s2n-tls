@@ -25,6 +25,8 @@
 #include "utils/s2n_result.h"
 #include "utils/s2n_safety.h"
 
+typedef enum { S2N_ASYNC_DECRYPT, S2N_ASYNC_SIGN } s2n_async_pkey_op_type;
+
 struct s2n_async_pkey_decrypt_data {
     s2n_async_pkey_decrypt_complete on_complete;
     struct s2n_blob                 encrypted;
@@ -133,6 +135,12 @@ S2N_RESULT s2n_async_pkey_decrypt(struct s2n_connection *conn, struct s2n_blob *
     RESULT_ENSURE_REF(init_decrypted);
     RESULT_ENSURE_REF(on_complete);
 
+    if (conn->config->async_pkey_decrypt_cb) {
+        RESULT_GUARD(s2n_async_pkey_decrypt_async(conn, encrypted, init_decrypted, on_complete));
+    } else {
+        /* TODO */
+    }
+
     if (conn->config->async_pkey_cb) {
         RESULT_GUARD(s2n_async_pkey_decrypt_async(conn, encrypted, init_decrypted, on_complete));
     } else {
@@ -171,7 +179,11 @@ S2N_RESULT s2n_async_pkey_decrypt_async(struct s2n_connection *conn, struct s2n_
     struct s2n_async_pkey_op *tmp_op = op;
     op = NULL;
 
-    RESULT_ENSURE(conn->config->async_pkey_cb(conn, tmp_op) == S2N_SUCCESS, S2N_ERR_ASYNC_CALLBACK_FAILED);
+    if (conn->config->async_pkey_decrypt_cb) {
+        RESULT_ENSURE(conn->config->async_pkey_decrypt_cb(conn, tmp_op) == S2N_SUCCESS, S2N_ERR_ASYNC_CALLBACK_FAILED);
+    } else {
+        RESULT_ENSURE(conn->config->async_pkey_cb(conn, tmp_op) == S2N_SUCCESS, S2N_ERR_ASYNC_CALLBACK_FAILED);
+    }
 
     /* Set state to waiting to allow op to be consumed by connection */
     conn->handshake.async_state = S2N_ASYNC_INVOKED_WAITING;
@@ -202,6 +214,13 @@ S2N_RESULT s2n_async_pkey_sign(struct s2n_connection *conn, s2n_signature_algori
     RESULT_ENSURE_REF(conn);
     RESULT_ENSURE_REF(digest);
     RESULT_ENSURE_REF(on_complete);
+
+    if (conn->config->async_pkey_sign_cb) {
+        RESULT_GUARD(s2n_async_pkey_sign_async(conn, sig_alg, digest, on_complete));
+    } else {
+        /* TODO */
+    }
+
 
     if (conn->config->async_pkey_cb) {
         RESULT_GUARD(s2n_async_pkey_sign_async(conn, sig_alg, digest, on_complete));
@@ -241,7 +260,11 @@ S2N_RESULT s2n_async_pkey_sign_async(struct s2n_connection *conn, s2n_signature_
     struct s2n_async_pkey_op *tmp_op = op;
     op = NULL;
 
-    RESULT_ENSURE(conn->config->async_pkey_cb(conn, tmp_op) == S2N_SUCCESS, S2N_ERR_ASYNC_CALLBACK_FAILED);
+    if (conn->config->async_pkey_sign_cb) {
+        RESULT_ENSURE(conn->config->async_pkey_sign_cb(conn, tmp_op) == S2N_SUCCESS, S2N_ERR_ASYNC_CALLBACK_FAILED);
+    } else {
+        RESULT_ENSURE(conn->config->async_pkey_cb(conn, tmp_op) == S2N_SUCCESS, S2N_ERR_ASYNC_CALLBACK_FAILED);
+    }
 
     /* Set state to waiting to allow op to be consumed by connection */
     conn->handshake.async_state = S2N_ASYNC_INVOKED_WAITING;
@@ -408,24 +431,6 @@ S2N_RESULT s2n_async_pkey_sign_free(struct s2n_async_pkey_op *op)
     RESULT_GUARD_POSIX(s2n_free(&sign->signature));
 
     return S2N_RESULT_OK;
-}
-
-int s2n_async_get_op_type(struct s2n_async_pkey_op *op, s2n_async_pkey_op_type * type)
-{
-    POSIX_ENSURE_REF(op);
-    POSIX_ENSURE_REF(type);
-
-    switch (op->type) {
-        case S2N_ASYNC_DECRYPT:
-            *type = S2N_ASYNC_DECRYPT;
-            return S2N_SUCCESS;
-        case S2N_ASYNC_SIGN:
-            *type = S2N_ASYNC_SIGN;
-            return S2N_SUCCESS;
-            /* No default for compiler warnings */
-    }
-
-    return S2N_FAILURE;
 }
 
 int s2n_async_pkey_op_get_input_size(struct s2n_async_pkey_op *op, uint32_t * data_len )

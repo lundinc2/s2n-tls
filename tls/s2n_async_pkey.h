@@ -65,7 +65,6 @@ int s2n_async_pkey_op_perform(struct s2n_async_pkey_op *op, s2n_cert_private_key
 int s2n_async_pkey_op_apply(struct s2n_async_pkey_op *op, struct s2n_connection *conn);
 int s2n_async_pkey_op_free(struct s2n_async_pkey_op *op);
 
-int s2n_async_get_op_type(struct s2n_async_pkey_op *op, s2n_async_pkey_op_type * type);
 int s2n_async_pkey_op_get_input_size(struct s2n_async_pkey_op *op, uint32_t * data_len );
 int s2n_async_pkey_op_get_input(struct s2n_async_pkey_op *op, uint8_t * data, uint32_t data_len );
 int s2n_async_pkey_copy_output(struct s2n_async_pkey_op *op, uint8_t * data, uint32_t data_len);

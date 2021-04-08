@@ -45,9 +45,11 @@
 struct s2n_async_pkey_op *pkey_op = NULL;
 static pthread_mutex_t pkcs11_mutex = {0};
 
+enum private_key_op_type { SIGN, DECRYPT };
 struct task_params {
     struct s2n_connection *conn;
     struct s2n_async_pkey_op *op;
+    enum private_key_op_type type;
 };
 
 struct host_verify_data {
@@ -291,7 +293,7 @@ void * pkey_task(void * params)
 
     struct s2n_connection *conn = info->conn;
     struct s2n_async_pkey_op *op = info->op;
-
+    enum private_key_op_type type = info->type;
     uint32_t input_len;
     s2n_async_pkey_op_get_input_size(op, &input_len );
     uint8_t * input = malloc(input_len);
@@ -300,12 +302,9 @@ void * pkey_task(void * params)
 
     uint8_t * output = NULL;
     uint32_t output_len = 0;
-
-    s2n_async_pkey_op_type type;
-    s2n_async_get_op_type(op, &type);
     
     pthread_mutex_lock(&pkcs11_mutex);
-    if(type == S2N_ASYNC_DECRYPT)
+    if(type == DECRYPT)
     {
         pkcs11_decrypt(input, input_len, &output, &output_len);
     }
@@ -324,13 +323,28 @@ void * pkey_task(void * params)
     pthread_exit(NULL);
 }
 
-int async_pkey_callback(struct s2n_connection *conn, struct s2n_async_pkey_op *op)
+int async_pkey_decrypt_callback(struct s2n_connection *conn, struct s2n_async_pkey_op *op)
 {
     EXPECT_NOT_NULL(op);
     pthread_t worker;
     struct task_params * params = malloc(sizeof(struct task_params));
     params->conn = conn; 
     params->op = op; 
+    params->type = DECRYPT;
+
+    POSIX_GUARD(pthread_create(&worker, NULL, &pkey_task, params));
+
+    return S2N_SUCCESS;
+}
+
+int async_pkey_sign_callback(struct s2n_connection *conn, struct s2n_async_pkey_op *op)
+{
+    EXPECT_NOT_NULL(op);
+    pthread_t worker;
+    struct task_params * params = malloc(sizeof(struct task_params));
+    params->conn = conn; 
+    params->op = op; 
+    params->type = SIGN;
 
     POSIX_GUARD(pthread_create(&worker, NULL, &pkey_task, params));
 
@@ -383,7 +397,8 @@ int main(int argc, char **argv)
             EXPECT_NOT_NULL(server_config = s2n_config_new());
             EXPECT_SUCCESS(s2n_config_add_cert_chain_and_key_to_store(server_config, chain_and_key));
             EXPECT_SUCCESS(s2n_config_add_dhparams(server_config, dhparams_pem));
-            EXPECT_SUCCESS(s2n_config_set_async_pkey_callback(server_config, async_pkey_callback));
+            EXPECT_SUCCESS(s2n_config_set_async_pkey_sign_callback(server_config, async_pkey_sign_callback));
+            EXPECT_SUCCESS(s2n_config_set_async_pkey_decrypt_callback(server_config, async_pkey_decrypt_callback));
             server_config->security_policy = &server_security_policy;
 
             struct host_verify_data verify_data = {.allow = 1, .callback_invoked = 0};
@@ -393,7 +408,8 @@ int main(int argc, char **argv)
 
             EXPECT_NOT_NULL(client_config = s2n_config_new());
             EXPECT_SUCCESS(s2n_config_add_cert_chain_and_key_to_store(client_config, chain_and_key));
-            EXPECT_SUCCESS(s2n_config_set_async_pkey_callback(client_config, async_pkey_callback));
+            EXPECT_SUCCESS(s2n_config_set_async_pkey_sign_callback(client_config, async_pkey_sign_callback));
+            EXPECT_SUCCESS(s2n_config_set_async_pkey_decrypt_callback(client_config, async_pkey_decrypt_callback));
             EXPECT_SUCCESS(s2n_config_set_verify_host_callback(client_config, verify_host_fn, &verify_data));
             EXPECT_SUCCESS(s2n_config_set_verification_ca_location(client_config, S2N_DEFAULT_TEST_CERT_CHAIN, NULL));
 

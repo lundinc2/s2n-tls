@@ -862,3 +862,18 @@ int s2n_config_set_key_log_cb(struct s2n_config *config, s2n_key_log_fn callback
 
     return S2N_SUCCESS;
 }
+int s2n_config_set_async_pkey_sign_callback(struct s2n_config *config, s2n_async_pkey_fn fn)
+{
+    POSIX_ENSURE_REF(fn);
+    config->async_pkey_sign_cb = fn;
+
+    return S2N_SUCCESS;
+}
+
+int s2n_config_set_async_pkey_decrypt_callback(struct s2n_config *config, s2n_async_pkey_fn fn)
+{
+    POSIX_ENSURE_REF(fn);
+    config->async_pkey_decrypt_cb = fn;
+
+    return S2N_SUCCESS;
+}
