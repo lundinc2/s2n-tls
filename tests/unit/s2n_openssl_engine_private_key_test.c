@@ -48,7 +48,6 @@ static uint8_t verify_host_fn(const char *host_name, size_t host_name_len, void 
     return 1;
 }
 
-
 static int pkcs11_decrypt(const char * pkcs11_uri,
                  const uint8_t * in, 
                  uint32_t in_len,
@@ -83,9 +82,11 @@ static int pkcs11_sign(const char * pkcs11_uri,
     POSIX_GUARD_PTR(ctx);
 
     POSIX_GUARD(EVP_PKEY_sign_init(ctx));
-    POSIX_GUARD(EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_PADDING));
+    if(strstr(pkcs11_uri, "rsa"))
+    {
+        POSIX_GUARD(EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_PADDING));
+    } 
     POSIX_GUARD(EVP_PKEY_CTX_set_signature_md(ctx, EVP_sha256()));
-
 
     POSIX_GUARD(EVP_PKEY_sign(ctx, NULL, sig_len, hash_buf, hash_len));
     uint8_t * sig = malloc(*sig_len);
@@ -115,11 +116,10 @@ void * pkey_task(void * params)
     s2n_async_pkey_op_type type;
     s2n_async_get_op_type(op, &type);
 
-    pthread_mutex_lock(&pkcs11_mutex);
-
     struct s2n_cert_chain_and_key * cert_key = s2n_connection_get_selected_cert(conn);
     char * uri = s2n_cert_chain_and_key_get_ctx(cert_key);
 
+    pthread_mutex_lock(&pkcs11_mutex);
     if(type == S2N_ASYNC_DECRYPT)
     {
         pkcs11_decrypt(uri, input, input_len, &output, &output_len);
@@ -174,7 +174,7 @@ int main(int argc, char **argv)
     char ecdsa_cert_chain_pem[S2N_MAX_TEST_PEM_SIZE];
 
     POSIX_GUARD(s2n_read_test_pem(S2N_DEFAULT_TEST_CERT_CHAIN, rsa_cert_chain_pem, S2N_MAX_TEST_PEM_SIZE));
-    POSIX_GUARD(s2n_read_test_pem(S2N_ECDSA_P256_PKCS1_CERT_CHAIN, ecdsa_cert_chain_pem, S2N_MAX_TEST_PEM_SIZE));
+    POSIX_GUARD(s2n_read_test_pem(S2N_DEFAULT_ECDSA_TEST_CERT_CHAIN, ecdsa_cert_chain_pem, S2N_MAX_TEST_PEM_SIZE));
 
     POSIX_GUARD_PTR(rsa_chain_and_key = s2n_cert_chain_and_key_new());
     POSIX_GUARD_PTR(ecdsa_chain_and_key = s2n_cert_chain_and_key_new());
@@ -222,18 +222,20 @@ int main(int argc, char **argv)
 
             EXPECT_NOT_NULL(client_config = s2n_config_new());
 
-            if(i >= sizeof(test_cipher_suites) / (sizeof(*test_cipher_suites[0]))/2) {
-                EXPECT_SUCCESS(s2n_config_set_verification_ca_location(server_config, S2N_ECDSA_P256_PKCS1_CERT_CHAIN, NULL));
+            if(i >= 2) {
+                EXPECT_SUCCESS(s2n_config_set_verification_ca_location(server_config, S2N_DEFAULT_ECDSA_TEST_CERT_CHAIN, NULL));
 
                 EXPECT_SUCCESS(s2n_config_set_cipher_preferences(client_config, "20190214"));
                 EXPECT_SUCCESS(s2n_config_add_cert_chain_and_key_to_store(client_config, ecdsa_chain_and_key));
-                EXPECT_SUCCESS(s2n_config_set_verification_ca_location(client_config, S2N_ECDSA_P256_PKCS1_CERT_CHAIN, NULL));
+                EXPECT_SUCCESS(s2n_config_set_verification_ca_location(client_config, S2N_DEFAULT_ECDSA_TEST_CERT_CHAIN, NULL));
             } else {
                 EXPECT_SUCCESS(s2n_config_set_verification_ca_location(server_config, S2N_DEFAULT_TEST_CERT_CHAIN, NULL));
 
                 EXPECT_SUCCESS(s2n_config_set_verification_ca_location(client_config, S2N_DEFAULT_TEST_CERT_CHAIN, NULL));
                 EXPECT_SUCCESS(s2n_config_add_cert_chain_and_key_to_store(client_config, rsa_chain_and_key));
             }
+            EXPECT_SUCCESS(s2n_config_set_async_pkey_callback(client_config, async_pkey_callback));
+            EXPECT_SUCCESS(s2n_config_set_verify_host_callback(client_config, verify_host_fn, NULL));
 
             /* Create connection */
             struct s2n_connection *client_conn = s2n_connection_new(S2N_CLIENT);
