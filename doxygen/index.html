@@ -9,19 +9,11 @@
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
-<link href="navtree.css" rel="stylesheet" type="text/css"/>
-<script type="text/javascript" src="resize.js"></script>
-<script type="text/javascript" src="navtreedata.js"></script>
-<script type="text/javascript" src="navtree.js"></script>
 <link href="search/search.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="search/searchdata.js"></script>
 <script type="text/javascript" src="search/search.js"></script>
-<script type="text/javascript">
-/* @license magnet:?xt=urn:btih:d3d9a9a6595521f9666a5e94cc830dab83b65699&amp;dn=expat.txt MIT */
-  $(document).ready(function() { init_search(); });
-/* @license-end */
-</script>
 <link href="doxygen.css" rel="stylesheet" type="text/css" />
+<link href="style.css" rel="stylesheet" type="text/css"/>
 </head>
 <body>
 <div id="top"><!-- do not remove this div, it is closed by doxygen! -->
@@ -31,25 +23,10 @@
  <tr id="projectrow">
   <td id="projectlogo"><img alt="Logo" src="s2n-logo-github.svg"/></td>
   <td id="projectalign">
-   <div id="projectname">AWS s2n-tls<span id="projectnumber">&#160;v1.3.12</span>
+   <div id="projectname">AWS s2n-tls<span id="projectnumber">&#160;v1.0.1-9072ced0</span>
    </div>
    <div id="projectbrief">s2n-tls is a C99 implementation of the TLS/SSL protocols that is designed to be simple, small, fast, and with security as a priority.</div>
   </td>
-    <td>        <div id="MSearchBox" class="MSearchBoxInactive">
-        <span class="left">
-          <img id="MSearchSelect" src="search/mag_sel.svg"
-               onmouseover="return searchBox.OnSearchSelectShow()"
-               onmouseout="return searchBox.OnSearchSelectHide()"
-               alt=""/>
-          <input type="text" id="MSearchField" value="Search" accesskey="S"
-               onfocus="searchBox.OnSearchFieldFocus(true)" 
-               onblur="searchBox.OnSearchFieldFocus(false)" 
-               onkeyup="searchBox.OnSearchFieldChange(event)"/>
-          </span><span class="right">
-            <a id="MSearchClose" href="javascript:searchBox.CloseResultsWindow()"><img id="MSearchCloseImg" border="0" src="search/close.svg" alt=""/></a>
-          </span>
-        </div>
-</td>
  </tr>
  </tbody>
 </table>
@@ -61,23 +38,18 @@
 var searchBox = new SearchBox("searchBox", "search",'Search','.html');
 /* @license-end */
 </script>
-</div><!-- top -->
-<div id="side-nav" class="ui-resizable side-nav-resizable">
-  <div id="nav-tree">
-    <div id="nav-tree-contents">
-      <div id="nav-sync" class="sync"></div>
-    </div>
-  </div>
-  <div id="splitbar" style="-moz-user-select:none;" 
-       class="ui-resizable-handle">
-  </div>
-</div>
+<script type="text/javascript" src="menudata.js"></script>
+<script type="text/javascript" src="menu.js"></script>
 <script type="text/javascript">
 /* @license magnet:?xt=urn:btih:d3d9a9a6595521f9666a5e94cc830dab83b65699&amp;dn=expat.txt MIT */
-$(document).ready(function(){initNavTree('index.html',''); initResizable(); });
+$(function() {
+  initMenu('',true,false,'search.php','Search');
+  $(document).ready(function() { init_search(); });
+});
 /* @license-end */
 </script>
-<div id="doc-content">
+<div id="main-nav"></div>
+</div><!-- top -->
 <!-- window showing the filter options -->
 <div id="MSearchSelectWindow"
      onmouseover="return searchBox.OnSearchSelectShow()"
@@ -149,35 +121,41 @@ Have a Question?</h2>
 Using s2n-tls</h2>
 <p >The s2n-tls I/O APIs are designed to be intuitive to developers familiar with the widely-used POSIX I/O APIs, and s2n-tls supports blocking, non-blocking, and full-duplex I/O. Additionally there are no locks or mutexes within s2n-tls.</p>
 <div class="fragment"><div class="line"><span class="comment">/* Create a server mode connection handle */</span></div>
-<div class="line"><span class="keyword">struct </span>s2n_connection *conn = s2n_connection_new(S2N_SERVER);</div>
+<div class="line"><span class="keyword">struct </span>s2n_connection *conn = <a class="code hl_function" href="s2n_8h.html#a58005ebdc3e4caf6b6f40321bbc5b1e5">s2n_connection_new</a>(S2N_SERVER);</div>
 <div class="line"><span class="keywordflow">if</span> (conn == NULL) {</div>
 <div class="line">    ... error ...</div>
 <div class="line">}</div>
 <div class="line"> </div>
 <div class="line"><span class="comment">/* Associate a connection with a file descriptor */</span></div>
-<div class="line"><span class="keywordflow">if</span> (s2n_connection_set_fd(conn, fd) &lt; 0) {</div>
+<div class="line"><span class="keywordflow">if</span> (<a class="code hl_function" href="s2n_8h.html#a67962bf835ce5145d215a9ee8f4985d3">s2n_connection_set_fd</a>(conn, fd) &lt; 0) {</div>
 <div class="line">    ... error ...</div>
 <div class="line">}</div>
 <div class="line"> </div>
 <div class="line"><span class="comment">/* Negotiate the TLS handshake */</span></div>
-<div class="line">s2n_blocked_status blocked;</div>
-<div class="line"><span class="keywordflow">if</span> (s2n_negotiate(conn, &amp;blocked) &lt; 0) {</div>
+<div class="line"><a class="code hl_enumeration" href="s2n_8h.html#af70ca0b089daa98cd79a424d3f6af15d">s2n_blocked_status</a> blocked;</div>
+<div class="line"><span class="keywordflow">if</span> (<a class="code hl_function" href="s2n_8h.html#ad3222e7aacf35a56be842678171be440">s2n_negotiate</a>(conn, &amp;blocked) &lt; 0) {</div>
 <div class="line">    ... error ...</div>
 <div class="line">}</div>
 <div class="line">    </div>
 <div class="line"><span class="comment">/* Write data to the connection */</span></div>
 <div class="line"><span class="keywordtype">int</span> bytes_written;</div>
-<div class="line">bytes_written = s2n_send(conn, <span class="stringliteral">&quot;Hello World&quot;</span>, <span class="keyword">sizeof</span>(<span class="stringliteral">&quot;Hello World&quot;</span>), &amp;blocked);</div>
+<div class="line">bytes_written = <a class="code hl_function" href="s2n_8h.html#a9afeb514731fa9d74edf6b9e1348c067">s2n_send</a>(conn, <span class="stringliteral">&quot;Hello World&quot;</span>, <span class="keyword">sizeof</span>(<span class="stringliteral">&quot;Hello World&quot;</span>), &amp;blocked);</div>
+<div class="ttc" id="as2n_8h_html_a58005ebdc3e4caf6b6f40321bbc5b1e5"><div class="ttname"><a href="s2n_8h.html#a58005ebdc3e4caf6b6f40321bbc5b1e5">s2n_connection_new</a></div><div class="ttdeci">S2N_API struct s2n_connection * s2n_connection_new(s2n_mode mode)</div></div>
+<div class="ttc" id="as2n_8h_html_a67962bf835ce5145d215a9ee8f4985d3"><div class="ttname"><a href="s2n_8h.html#a67962bf835ce5145d215a9ee8f4985d3">s2n_connection_set_fd</a></div><div class="ttdeci">S2N_API int s2n_connection_set_fd(struct s2n_connection *conn, int fd)</div></div>
+<div class="ttc" id="as2n_8h_html_a9afeb514731fa9d74edf6b9e1348c067"><div class="ttname"><a href="s2n_8h.html#a9afeb514731fa9d74edf6b9e1348c067">s2n_send</a></div><div class="ttdeci">S2N_API ssize_t s2n_send(struct s2n_connection *conn, const void *buf, ssize_t size, s2n_blocked_status *blocked)</div></div>
+<div class="ttc" id="as2n_8h_html_ad3222e7aacf35a56be842678171be440"><div class="ttname"><a href="s2n_8h.html#ad3222e7aacf35a56be842678171be440">s2n_negotiate</a></div><div class="ttdeci">S2N_API int s2n_negotiate(struct s2n_connection *conn, s2n_blocked_status *blocked)</div></div>
+<div class="ttc" id="as2n_8h_html_af70ca0b089daa98cd79a424d3f6af15d"><div class="ttname"><a href="s2n_8h.html#af70ca0b089daa98cd79a424d3f6af15d">s2n_blocked_status</a></div><div class="ttdeci">s2n_blocked_status</div><div class="ttdef"><b>Definition:</b> s2n.h:1705</div></div>
 </div><!-- fragment --><p >For details on building the s2n-tls library and how to use s2n-tls in an application you are developing, see the <a href="https://github.com/aws/s2n-tls/blob/main/docs/USAGE-GUIDE.md">API Reference</a>.</p>
 <h2><a class="anchor" id="autotoc_md25"></a>
 s2n-tls features</h2>
 <p >s2n-tls implements SSLv3, TLS1.0, TLS1.1, TLS1.2, and TLS1.3. For encryption, s2n-tls supports 128-bit and 256-bit AES in the CBC and GCM modes, ChaCha20, 3DES, and RC4. For forward secrecy, s2n-tls supports both DHE and ECDHE. s2n-tls also supports the Server Name Indicator (SNI), Application-Layer Protocol Negotiation (ALPN), and Online Certificate Status Protocol (OCSP) TLS extensions. SSLv3, RC4, 3DES, and DHE are each disabled by default for security reasons.</p>
 <p >As it can be difficult to keep track of which encryption algorithms and protocols are best to use, s2n-tls features a simple API to use the latest "default" set of preferences. If you prefer to remain on a specific version for backwards compatibility, that is also supported.</p>
 <div class="fragment"><div class="line"><span class="comment">/* Use the latest s2n-tls &quot;default&quot; set of ciphersuite and protocol preferences */</span></div>
-<div class="line">s2n_config_set_cipher_preferences(config, <span class="stringliteral">&quot;default&quot;</span>);</div>
+<div class="line"><a class="code hl_function" href="s2n_8h.html#a3afea5198d804621399d8fd9875cfdb0">s2n_config_set_cipher_preferences</a>(config, <span class="stringliteral">&quot;default&quot;</span>);</div>
 <div class="line"> </div>
 <div class="line"><span class="comment">/* Use a specific set of preferences, update when you&#39;re ready */</span></div>
-<div class="line">s2n_config_set_cipher_preferences(config, <span class="stringliteral">&quot;20150306&quot;</span>)</div>
+<div class="line"><a class="code hl_function" href="s2n_8h.html#a3afea5198d804621399d8fd9875cfdb0">s2n_config_set_cipher_preferences</a>(config, <span class="stringliteral">&quot;20150306&quot;</span>)</div>
+<div class="ttc" id="as2n_8h_html_a3afea5198d804621399d8fd9875cfdb0"><div class="ttname"><a href="s2n_8h.html#a3afea5198d804621399d8fd9875cfdb0">s2n_config_set_cipher_preferences</a></div><div class="ttdeci">S2N_API int s2n_config_set_cipher_preferences(struct s2n_config *config, const char *version)</div></div>
 </div><!-- fragment --><h2><a class="anchor" id="autotoc_md26"></a>
 s2n-tls safety mechanisms</h2>
 <p >Internally s2n-tls takes a systematic approach to data protection and includes several mechanisms designed to improve safety.</p>
@@ -218,12 +196,9 @@ Language Bindings for s2n-tls</h2>
 <p >See our <a href="https://github.com/aws/s2n-tls/blob/main/docs/BINDINGS.md">language bindings list</a> for language bindings for s2n-tls that we're aware of. </p>
 </div></div><!-- PageDoc -->
 </div><!-- contents -->
-</div><!-- doc-content -->
 <!-- start footer part -->
-<div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->
-  <ul>
-    <li class="footer">Generated by <a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.3 </li>
-  </ul>
-</div>
+<hr class="footer"/><address class="footer"><small>
+Generated by&#160;<a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.3
+</small></address>
 </body>
 </html>
