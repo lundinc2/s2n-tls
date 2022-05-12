@@ -23,7 +23,7 @@
  <tr id="projectrow">
   <td id="projectlogo"><img alt="Logo" src="s2n-logo-github.svg"/></td>
   <td id="projectalign">
-   <div id="projectname">AWS s2n-tls<span id="projectnumber">&#160;v1.3.9-0e93410c</span>
+   <div id="projectname">AWS s2n-tls<span id="projectnumber">&#160;v1.3.13-547704f4</span>
    </div>
    <div id="projectbrief">s2n-tls is a C99 implementation of the TLS/SSL protocols that is designed to be simple, small, fast, and with security as a priority.</div>
   </td>
@@ -1076,7 +1076,7 @@ ECDSA, etc). The callback should return a pointer to the <code>s2n_cert_chain_an
       </table>
 </div><div class="memdoc">
 <p >Callback function type used to get the system time.</p>
-<p >Takes two arguments. A pointer to a arbitrary data for callers to stuff data in the callback and a pointer to a 64 bit int. The 64 bit pointer should be set to the number of nanoseconds since the Unix epoch.</p>
+<p >Takes two arguments. A pointer to arbitrary data for use within the callback and a pointer to a 64 bit int. the callback and a pointer to a 64 bit int. The 64 bit pointer should be set to the number of nanoseconds since the Unix epoch.</p>
 <p >The function should return 0 on success and -1 on failure. </p>
 
 </div>
@@ -5540,7 +5540,7 @@ Safety</h1>
 <p >Gets user defined context from a <code>s2n_connection</code> object.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">conn</td><td>The connection object that the desired context </td></tr>
+    <tr><td class="paramname">conn</td><td>The connection object that contains the desired context </td></tr>
   </table>
   </dd>
 </dl>
@@ -6283,7 +6283,7 @@ Safety</h1>
 </div><div class="memdoc">
 <p >Serializes the session state from connection and copies into the <code>session</code> buffer and returns the number of copied bytes</p>
 <p >The output of this function depends on whether session ids or session tickets are being used for resumption.</p>
-<dl class="section note"><dt>Note</dt><dd>This is for &lt; TLS 1.2 session resumption.</dd></dl>
+<dl class="section note"><dt>Note</dt><dd>This is for &lt; TLS 1.3 session resumption.</dd></dl>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">conn</td><td>A pointer to the s2n_connection object </td></tr>
@@ -6330,7 +6330,6 @@ Safety</h1>
 <p >Gets the latest session id from the connection, copies it into the <code>session_id</code> buffer, and returns the number of copied bytes.</p>
 <p >The session id may change between s2n receiving the ClientHello and sending the ServerHello, but this function will always describe the latest session id.</p>
 <p >See <a class="el" href="s2n_8h.html#ae86458717edccfb2f58b86f3991af1a9">s2n_client_hello_get_session_id()</a> to get the session id as it was sent by the client in the ClientHello message.</p>
-<dl class="section note"><dt>Note</dt><dd>This is for &lt; TLS 1.2 session resumption.</dd></dl>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">conn</td><td>A pointer to the s2n_connection object </td></tr>
@@ -6360,7 +6359,6 @@ Safety</h1>
 </div><div class="memdoc">
 <p >Gets the latest session id's length from the connection.</p>
 <p >Use this to query the session id size before copying it into a buffer.</p>
-<dl class="section note"><dt>Note</dt><dd>This is for &lt; TLS 1.2 session resumption.</dd></dl>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">conn</td><td>A pointer to the s2n_connection object</td></tr>
@@ -6387,7 +6385,6 @@ Safety</h1>
       </table>
 </div><div class="memdoc">
 <p >Use this to query the serialized session state size before copying it into a buffer.</p>
-<dl class="section note"><dt>Note</dt><dd>This is for &lt; TLS 1.2 session resumption.</dd></dl>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">conn</td><td>A pointer to the s2n_connection object</td></tr>
@@ -6414,7 +6411,6 @@ Safety</h1>
       </table>
 </div><div class="memdoc">
 <p >Get the lifetime hint for a session.</p>
-<dl class="section note"><dt>Note</dt><dd>This is for &lt; TLS 1.2 session resumption.</dd></dl>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">conn</td><td>A pointer to the s2n_connection object</td></tr>
@@ -6595,7 +6591,6 @@ Safety</h1>
       </table>
 </div><div class="memdoc">
 <p >Check if the connection was resumed from an earlier handshake.</p>
-<dl class="section note"><dt>Note</dt><dd>This is for &lt; TLS 1.2 session resumption.</dd></dl>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">conn</td><td>A pointer to the s2n_connection object</td></tr>
@@ -7472,7 +7467,6 @@ The callback may send less than the requested length. The function should return
       </table>
 </div><div class="memdoc">
 <p >De-serializes the session state and updates the connection accordingly.</p>
-<dl class="section note"><dt>Note</dt><dd>This is for &lt; TLS 1.2 session resumption.</dd></dl>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">conn</td><td>A pointer to the s2n_connection object </td></tr>
@@ -7700,7 +7694,7 @@ Reusing the same connection handle(s) is more performant than repeatedly calling
         </tr>
       </table>
 </div><div class="memdoc">
-<p >Get's the category of error from an error.</p>
+<p >Gets the category of error from an error.</p>
 <p >s2n-tls organizes errors into different "types" to allow applications to do logic on error values without catching all possibilities. Applications using non-blocking I/O should check error type to determine if the I/O operation failed because it would block or for some other error.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
@@ -9460,7 +9454,7 @@ Safety</h1>
 </div><div class="memdoc">
 <p >s2n-tls functions that return 'int' return 0 to indicate success and -1 to indicate failure.</p>
 <p >s2n-tls functions that return pointer types return NULL in the case of failure.</p>
-<p >When an s2n-tls function returns a failure, s2n_errno will be set to a value corresponding to the error. This error value can be translated into a string explaining the error in English by calling s2n_strerror(s2n_errno, "EN"). A string containing human readable error name, can be generated with <code>s2n_strerror_name</code>. A string containing internal debug information, including filename and line number, can be generated with <code>s2n_strerror_debug</code>. This string is useful to include when reporting issues to the s2n-tls development team.</p>
+<p >When an s2n-tls function returns a failure, s2n_errno will be set to a value corresponding to the error. This error value can be translated into a string explaining the error in English by calling s2n_strerror(s2n_errno, "EN"). A string containing human readable error name; can be generated with <code>s2n_strerror_name</code>. A string containing internal debug information, including filename and line number, can be generated with <code>s2n_strerror_debug</code>. This string is useful to include when reporting issues to the s2n-tls development team.</p>
 <dl class="section warning"><dt>Warning</dt><dd>To avoid possible confusion, s2n_errno should be cleared after processing an error: <code>s2n_errno = S2N_ERR_T_OK</code> </dd></dl>
 
 </div>
