@@ -137,9 +137,9 @@ extern int *s2n_errno_location(void);
  * This enum is optimized for use in C switch statements. Each value in the enum represents
  * an error "category".
  *
- * s2n-tls organizes errors into different "types" to allow applications to do logic on error
+ * s2n-tls organizes errors into different "types" to allow applications to handle error
  * values without catching all possibilities. Applications using non-blocking I/O should check
- * error type to determine if the I/O operation failed because it would block or for some other
+ * the error type to determine if the I/O operation failed because it would block or for some other
  * error. To retrieve the type for a given error use `s2n_error_get_type()`. Applications should
  * perform any error handling logic using these high level types.
  */

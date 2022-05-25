@@ -418,8 +418,8 @@ int s2n_get_stacktrace(char*** trace, int* trace_size);
 
 ### Error categories
 
-s2n-tls organizes errors into different "types" to allow applications to do logic on error values without catching all possibilities.
-Applications using non-blocking I/O should check error type to determine if the I/O operation failed because it would block or for some other error. To retrieve the type for a given error use `s2n_error_get_type()`.
+s2n-tls organizes errors into different "types" to allow applications to handle error values without catching all possibilities.
+Applications using non-blocking I/O should check the error type to determine if the I/O operation failed because it would block or for some other error. To retrieve the type for a given error use `s2n_error_get_type()`.
 Applications should perform any error handling logic using these high level types:
 
 ```
