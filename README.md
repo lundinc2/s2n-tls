@@ -73,7 +73,7 @@ s2n-tls uses [Doxygen](https://doxygen.nl/index.html) to document its public API
 
 Documentation for older versions or branches of s2n-tls can be generated locally. To generate the documentation, install doxygen and run `doxygen docs/doxygen/Doxyfile`. The doxygen documentation can now be found at `docs/doxygen/output/html/index.html`.
 
-Doxygen can be installed via one of the following platform dependent commands. Alternatively, more instructions are available at the [Doxygen](https://doxygen.nl/download.html) webpage.
+Doxygen installation instructions are available at the [Doxygen](https://doxygen.nl/download.html) webpage.
 
 ## Using s2n-tls
 
