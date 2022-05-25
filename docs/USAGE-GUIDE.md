@@ -230,6 +230,16 @@ sizes may change.
 
 The VERSIONING.rst document contains more details about s2n's approach to versions and API changes.
 
+## API Reference
+
+s2n-tls uses [Doxygen](https://doxygen.nl/index.html) to document its public API. The latest s2n-tls documentation can be found on [GitHub pages](https://aws.github.io/s2n-tls/doxygen/).
+
+Documentation for older versions or branches of s2n-tls can be generated locally. To generate the documentation, install doxygen and run `doxygen docs/doxygen/Doxyfile`. The doxygen documentation can now be found at `docs/doxygen/output/html/index.html`.
+
+Doxygen can be installed via one of the following platform dependent commands. Alternatively, more instructions are available at the [Doxygen](https://doxygen.nl/download.html) webpage.
+
+This web page should be used in conjunction with this guide.
+
 ## Preprocessor macros
 
 s2n-tls defines five preprocessor macros that are used to determine what

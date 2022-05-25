@@ -136,16 +136,30 @@ extern int *s2n_errno_location(void);
  *
  * This enum is optimized for use in C switch statements. Each value in the enum represents
  * an error "category".
+ *
+ * s2n-tls organizes errors into different "types" to allow applications to do logic on error
+ * values without catching all possibilities. Applications using non-blocking I/O should check
+ * error type to determine if the I/O operation failed because it would block or for some other
+ * error. To retrieve the type for a given error use `s2n_error_get_type()`. Applications should
+ * perform any error handling logic using these high level types.
  */
 typedef enum {
-    S2N_ERR_T_OK=0,
-    S2N_ERR_T_IO,
-    S2N_ERR_T_CLOSED,
-    S2N_ERR_T_BLOCKED,
-    S2N_ERR_T_ALERT,
-    S2N_ERR_T_PROTO,
-    S2N_ERR_T_INTERNAL,
-    S2N_ERR_T_USAGE
+  /** No error */
+  S2N_ERR_T_OK=0,
+  /** Underlying I/O operation failed, check system errno */
+  S2N_ERR_T_IO, 
+  /** EOF */
+  S2N_ERR_T_CLOSED,
+  /** Underlying I/O operation would block */
+  S2N_ERR_T_BLOCKED,
+  /** Incoming Alert */
+  S2N_ERR_T_ALERT,
+  /** Failure in some part of the TLS protocol. Ex: CBC verification failure */
+  S2N_ERR_T_PROTO,
+  /** Error internal to s2n-tls. A precondition could have failed. */
+  S2N_ERR_T_INTERNAL,
+  /** User input error. Ex: Providing an invalid cipher preference version */
+  S2N_ERR_T_USAGE 
 } s2n_error_type;
 
 /**
@@ -1727,18 +1741,6 @@ extern int s2n_negotiate(struct s2n_connection *conn, s2n_blocked_status *blocke
  * @note Partial writes are possible not just for non-blocking I/O, but also for connections aborted while active. 
  * @note Unlike OpenSSL, repeated calls to s2n_send() should not duplicate the original parameters, but should 
  * update `buf` and `size` per the indication of size written. For example;
- * ```c
- * s2n_blocked_status blocked;
- * int written = 0;
- * char data[10]; 
- * do {
- *     int w = s2n_send(conn, data + written, 10 - written, &blocked);
- *     if (w < 0) {
- *         break;
- *     }
- *     written += w;
- * } while (blocked != S2N_NOT_BLOCKED);
- * ```
  *
  * @param conn A pointer to the s2n_connection object
  * @param buf A pointer to a buffer that s2n will write data from
@@ -1770,22 +1772,6 @@ extern ssize_t s2n_sendv(struct s2n_connection *conn, const struct iovec *bufs, 
  *
  * @note Unlike OpenSSL, repeated calls to s2n_sendv_with_offset() should not duplicate the original parameters, but should update `bufs` and `count` per the indication of size written. For example;
  * 
- * ```c
- * s2n_blocked_status blocked;
- * int written = 0;
- * char data[10]; 
- * struct iovec iov[1];
- * iov[0].iov_base = data;
- * iov[0].iov_len = 10;
- * do {
- *     int w = s2n_sendv_with_offset(conn, iov, 1, written, &blocked);
- *     if (w < 0) {
- *         break;
- *     }
- *     written += w;
- * } while (blocked != S2N_NOT_BLOCKED);
- * ```
- *
  * @param conn A pointer to the s2n_connection object
  * @param bufs A pointer to a vector of buffers that s2n will write data from.
  * @param count The number of buffers in `bufs`
@@ -1801,18 +1787,6 @@ extern ssize_t s2n_sendv_with_offset(struct s2n_connection *conn, const struct i
  * connection. 
  * 
  * @note Unlike OpenSSL, repeated calls to `s2n_recv` should not duplicate the original parameters, but should update `buf` and `size` per the indication of size read. For example;
- * ```c
- * s2n_blocked_status blocked;
- * int bytes_read = 0;
- * char data[10];
- * do {
- *     int r = s2n_recv(conn, data + bytes_read, 10 - bytes_read, &blocked);
- *     if (r < 0) {
- *         break;
- *     }
- *     bytes_read += r;
- * } while (blocked != S2N_NOT_BLOCKED);
- * ```
  *
  * @param conn A pointer to the s2n_connection object
  * @param buf A pointer to a buffer that s2n will place read data into.
@@ -2721,13 +2695,6 @@ extern int s2n_connection_client_cert_used(struct s2n_connection *conn);
 /**
  * A function that provides a human readable string of the cipher suite that was chosen
  * for a connection.
- *
- * @warning The string "TLS_NULL_WITH_NULL_NULL" is returned before the TLS handshake has been performed.
- * This does not mean that the ciphersuite "TLS_NULL_WITH_NULL_NULL" will be used by the connection,
- * it is merely being used as a placeholder.
- *
- * @note This function is only accurate after the TLS handshake.
- *
  * @param conn A pointer to the connection
  * @returns A string indicating the cipher suite negotiated by s2n in OpenSSL format.
  */
