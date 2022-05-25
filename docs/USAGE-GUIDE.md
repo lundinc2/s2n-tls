@@ -464,16 +464,6 @@ if (s2n_recv(conn, &blocked) < 0) {
 
 ## Initialization and teardown
 
-### s2n\_get\_openssl\_version
-
-```c
-unsigned long s2n_get_openssl_version();
-```
-
-**s2n_get_openssl_version** returns the version number of OpenSSL that s2n-tls was compiled with. It can be used by
-applications to validate at runtime that the versions of s2n-tls and Openssl that they have loaded are correct.
-
-
 ### s2n\_init
 
 ```c
@@ -526,40 +516,6 @@ called from each thread or process that is created subsequent to calling **s2n_i
 when that thread or process is done calling other s2n-tls functions.
 
 ## Configuration-oriented functions
-
-### s2n\_config\_new
-
-```c
-struct s2n_config * s2n_config_new();
-```
-
-**s2n_config_new** returns a new configuration object suitable for associating certs and keys.
-This object can (and should) be associated with many connection objects.
-
-### s2n\_config\_free
-
-```c
-int s2n_config_free(struct s2n_config *config);
-```
-
-**s2n_config_free** frees the memory associated with an **s2n_config** object.
-
-### s2n\_config\_set\_ctx
-
-```c
-int s2n_config_set_ctx(struct s2n_config *config, void *ctx);
-```
-
-**s2n_config_set_ctx** sets user defined context on the **s2n_config** object.
-
-### s2n\_config\_get\_ctx
-
-```c
-int s2n_config_get_ctx(struct s2n_config *config, void **ctx);
-```
-
-**s2n_config_get_ctx** gets user defined context from the **s2n_config** object.
-
 
 ### s2n\_config\_set\_cipher\_preferences
 
@@ -667,22 +623,6 @@ The following chart maps the security policy version to the supported curves/gro
 |   "20190802"   |      X       |      X     |        |
 |   "20200207"   |      X       |      X     |   X    |
 
-### s2n\_config\_add\_cert\_chain\_and\_key
-
-```c
-int s2n_config_add_cert_chain_and_key(struct s2n_config *config,
-                                      const char *cert_chain_pem,
-                                      const char *private_key_pem);
-```
-
-**s2n_config_add_cert_chain_and_key** associates a certificate chain and a
-private key, with an **s2n_config** object. At present, only one
-certificate-chain/key pair may be associated with a config.
-
-**cert_chain_pem** should be a PEM encoded certificate chain, with the first
-certificate in the chain being your servers certificate. **private_key_pem**
-should be a PEM encoded private key corresponding to the server certificate.
-
 ### s2n\_config\_add\_cert\_chain\_and\_key\_to\_store
 
 ```c
@@ -723,16 +663,6 @@ int s2n_config_set_cert_tiebreak_callback(struct s2n_config *config, s2n_cert_ti
 
 **s2n_config_set_cert_tiebreak_callback** sets the **s2n_cert_tiebreak_callback** for resolving domain name conflicts. If no callback is set, the first certificate added for a domain name will always be preferred.
 
-### s2n\_config\_add\_dhparams
-
-```c
-int s2n_config_add_dhparams(struct s2n_config *config,
-                            char *dhparams_pem);
-```
-
-**s2n_config_add_dhparams** associates a set of Diffie-Hellman parameters with
-an **s2n_config** object. **dhparams_pem** should be PEM encoded DH parameters.
-
 ### s2n\_config\_set\_protocol\_preferences
 
 ```c
@@ -749,16 +679,6 @@ included in the Client Hello message as the ALPN extension.  As an
 **S2N_SERVER**, the list is used to negotiate a mutual application protocol
 with the client. After the negotiation for the connection has completed, the
 agreed upon protocol can be retrieved with [s2n_get_application_protocol](#s2n_get_application_protocol)
-
-### s2n\_config\_set\_status\_request\_type
-
-```c
-int s2n_config_set_status_request_type(struct s2n_config *config, s2n_status_request_type type);
-```
-
-**s2n_config_set_status_request_type** Sets up an S2N_CLIENT to request the
-server certificate status during an SSL handshake.  If set to
-S2N_STATUS_REQUEST_NONE, no status request is made.
 
 ### s2n\_config\_set\_extension\_data
 
@@ -898,23 +818,6 @@ int s2n_config_set_check_stapled_ocsp_response(struct s2n_config *config, uint8_
 will be validated when they are encountered, while 0 means this step will be skipped. The default value is 1 if the underlying
 libCrypto implementation supports OCSP.  Returns 0 on success and -1 on failure.
 
-### s2n\_config\_disable\_x509\_verification
-
-```c
-int s2n_config_disable_x509_verification(struct s2n_config *config);
-```
-
-**s2n_config_disable_x509_verification** turns off all X.509 validation during the negotiation phase of the connection. This should only be used
-for testing or debugging purposes.
-
-```c
-int s2n_config_set_max_cert_chain_depth(struct s2n_config *config, uint16_t max_depth);
-```
-
-**s2n_config_set_max_cert_chain_depth** sets the maximum allowed depth of a cert chain used for X509 validation. The default value is 7. If this limit
-is exceeded, validation will fail if s2n_config_disable_x509_verification() has not been called. 0 is an illegal value and will return an error.
-1 means only a root certificate will be used.
-
 ### s2n\_config\_set\_client\_hello\_cb
 
 ```c
@@ -997,20 +900,6 @@ Sets whether or not a connection should enforce strict signature validation duri
 
 ## Certificate-related functions
 
-### s2n\_cert\_chain\_and\_key\_new
-
-```c
-struct s2n_cert_chain_and_key *s2n_cert_chain_and_key_new(void);
-```
-**s2n_cert_chain_and_key_new** returns a new object used to represent a certificate-chain/key pair. This object can be associated with many config objects.
-
-### s2n\_cert\_chain\_and\_key\_free
-
-```c
-int s2n_cert_chain_and_key_free(struct s2n_cert_chain_and_key *cert_and_key);
-```
-**s2n_cert_chain_and_key_free** frees the memory associated with an **s2n_cert_chain_and_key** object.
-
 ### s2n\_cert\_chain\_and\_key\_load\_pem
 
 ```c
@@ -1046,33 +935,6 @@ int s2n_cert_chain_and_key_load_public_pem_bytes(struct s2n_cert_chain_and_key *
 
 **chain_pem** should be a PEM encoded certificate chain, with the first certificate in the chain being your leaf certificate.
 **chain_pem_len** is the length in bytes of the PEM encoded certificate chain.
-
-### s2n\_cert\_chain\_and\_key\_set\_ctx
-
-```c
-int s2n_cert_chain_and_key_set_ctx(struct s2n_cert_chain_and_key *chain_and_key, void *ctx);
-```
-
-**s2n_cert_chain_and_key_set_ctx** associates an application defined context with a **s2n_cert_chain_and_key** object.
-This is useful when multiple s2n_cert_chain_and_key objects are used and the application would like to associate unique data
-with each certificate.
-
-### s2n\_cert\_chain\_and\_key\_get\_ctx
-
-```c
-int s2n_cert_chain_and_key_get_ctx(struct s2n_cert_chain_and_key *chain_and_key);
-```
-
-**s2n_cert_chain_and_key_set_ctx** returns a previously set context pointer or NULL if no context was set.
-
-### s2n\_cert\_chain\_and\_key\_get\_key
-
-```c
-extern s2n_cert_private_key *s2n_cert_chain_and_key_get_private_key(struct s2n_cert_chain_and_key *cert_and_key);
-```
-
-**s2n_cert_chain_and_key_get_private_key** returns a private key from
-**s2n_cert_chain_and_key** object.
 
 ## Client Auth Related calls
 Client Auth Related API's are not recommended for normal users. Use of these API's is discouraged.
@@ -1208,24 +1070,6 @@ int s2n_connection_set_config(struct s2n_connection *conn,
 **s2n_connection_set_config** Associates a configuration object with a
 connection.
 
-### s2n\_connection\_set\_ctx
-
-```c
-int s2n_connection_set_ctx(struct s2n_connection *conn, void *ctx);
-```
-
-**s2n_connection_set_ctx** sets user defined context in **s2n_connection**
-object.
-
-### s2n\_connection\_get\_ctx
-
-```c
-void *s2n_connection_get_ctx(struct s2n_connection *conn);
-```
-
-**s2n_connection_get_ctx** gets user defined context from **s2n_connection**
-object.
-
 ### s2n\_connection\_set\_fd
 
 ```c
@@ -1246,62 +1090,6 @@ types of I/O).
 If the read end of the pipe is closed unexpectedly, writing to the pipe will raise
 a SIGPIPE signal. **s2n-tls does NOT handle SIGPIPE.** A SIGPIPE signal will cause
 the process to terminate unless it is handled or ignored by the application.
-
-### s2n\_connection\_is\_valid\_for\_cipher\_preferences
-
-```c
-int s2n_connection_is_valid_for_cipher_preferences(struct s2n_connection *conn, const char *version);
-```
-
-**s2n_connection_is_valid_for_cipher_preferences** checks if the cipher used by current connection
-is supported by a given cipher preferences. It returns
--  1 if the connection satisfies the cipher suite
--  0 if it does not
-- -1 on any other errors
-
-
-### s2n\_connection\_set\_cipher\_preferences
-
-```c
-int s2n_connection_set_cipher_preferences(struct s2n_connection *conn, const char *version);
-```
-
-**s2n_connection_set_cipher_preferences** sets the cipher preference override for the
-s2n_connection. Calling this function is not necessary unless you want to set the
-cipher preferences on the connection to something different than what is in the s2n_config.
-
-
-### s2n\_connection\_set\_protocol\_preferences
-
-```c
-int s2n_connection_set_protocol_preferences(struct s2n_connection *conn, const char * const *protocols, int protocol_count);
-```
-
-**s2n_connection_set_protocol_preferences** sets the protocol preference override for the
-s2n_connection. Calling this function is not necessary unless you want to set the
-protocol preferences on the connection to something different than what is in the s2n_config.
-
-### s2n\_set\_server\_name
-
-```c
-int s2n_set_server_name(struct s2n_connection *conn,
-                        const char *server_name);
-```
-
-**s2n_set_server_name** Sets the server name for the connection. In future,
-this can be used by clients who wish to use the TLS "Server Name indicator"
-extension. At present, client functionality is disabled.
-
-### s2n\_get\_server\_name
-
-```c
-const char *s2n_get_server_name(struct s2n_connection *conn);
-```
-
-**s2n_get_server_name** returns the server name associated with a connection,
-or NULL if none is found. This can be used by a server to determine which server
-name the client is using. This function returns the first ServerName entry in the ServerNameList
-sent by the client. Subsequent entries are not returned.
 
 ### s2n\_connection\_set\_blinding
 
@@ -1342,17 +1130,6 @@ preferring throughput will use large record sizes that minimize overhead.
 provides a smooth transition from **s2n_connection_prefer_low_latency** to **s2n_connection_prefer_throughput**.
 **s2n_send** uses small TLS records that fit into a single TCP segment for the resize_threshold bytes (cap to 8M) of data
 and reset record size back to a single segment after timeout_threshold seconds of inactivity.
-
-### s2n\_connection\_get\_wire\_bytes
-
-```c
-uint64_t s2n_connection_get_wire_bytes_in(struct s2n_connection *conn);
-uint64_t s2n_connection_get_wire_bytes_out(struct s2n_connection *conn);
-```
-
-**s2n_connection_get_wire_bytes_in** and **s2n_connection_get_wire_bytes_out**
-return the number of bytes transmitted by s2n-tls "on the wire", in and out
-respectively.
 
 ### s2n\_connection\_get\_protocol\_version
 
@@ -1468,84 +1245,6 @@ These functions retrieve the session id as sent by the client in the ClientHello
 
 **s2n_client_hello_get_session_id** copies up to **max_length** bytes of the ClientHello session_id into the **out** buffer and stores the number of copied bytes in **out_length**.
 
-### s2n\_connection\_client\_cert\_used
-
-```c
-int s2n_connection_client_cert_used(struct s2n_connection *conn);
-```
-**s2n_connection_client_cert_used** returns 1 if the handshake completed and Client Auth was
-negotiated during the handshake.
-
-### s2n\_get\_application\_protocol
-
-```c
-const char *s2n_get_application_protocol(struct s2n_connection *conn);
-```
-
-**s2n_get_application_protocol** returns the negotiated application protocol
-for a **s2n_connection**.  In the event of no protocol being negotiated, NULL
-is returned.
-
-### s2n\_connection\_get\_ocsp\_response
-
-```c
-const uint8_t *s2n_connection_get_ocsp_response(struct s2n_connection *conn, uint32_t *length);
-```
-
-**s2n_connection_get_ocsp_response** returns the OCSP response sent by a server
-during the handshake.  If no status response is received, NULL is returned.
-
-### s2n\_connection\_is\_ocsp\_stapled
-
-```c
-int s2n_connection_is_ocsp_stapled(struct s2n_connection *conn);
-```
-
-**s2n_connection_is_ocsp_stapled** returns 1 if OCSP response was sent (if connection is in S2N_SERVER mode) or received (if connection is in S2N_CLIENT mode) during handshake, otherwise it returns 0.
-
-### s2n\_connection\_get\_handshake\_type\_name
-
-```c
-const char *s2n_connection_get_handshake_type_name(struct s2n_connection *conn);
-```
-
-**s2n_connection_get_handshake_type_name** returns a human-readable handshake type name, e.g. "NEGOTIATED|FULL_HANDSHAKE|PERFECT_FORWARD_SECRECY"
-
-### s2n\_connection\_get\_last\_message\_name
-
-```c
-const char *s2n_connection_get_last_message_name(struct s2n_connection *conn);
-```
-
-**s2n_connection_get_last_message_name** returns the last message name in TLS state machine, e.g. "SERVER_HELLO", "APPLICATION_DATA".
-
-### s2n\_connection\_get\_alert
-
-```c
-int s2n_connection_get_alert(struct s2n_connection *conn);
-```
-
-If a connection was shut down by the peer, **s2n_connection_get_alert** returns
-the TLS alert code that caused a connection to be shut down. s2n-tls considers all
-TLS alerts fatal and shuts down a connection whenever one is received.
-
-### s2n\_connection\_get\_cipher
-
-```c
-const char * s2n_connection_get_cipher(struct s2n_connection *conn);
-```
-
-**s2n_connection_get_cipher** returns a string indicating the cipher suite
-negotiated by s2n-tls for a connection in Openssl format, e.g. "ECDHE-RSA-AES128-GCM-SHA256".
-
-### s2n\_connection\_get\_curve
-
-```c
-const char * s2n_connection_get_curve(struct s2n_connection *conn);
-```
-
-**s2n_connection_get_curve** returns a string indicating the elliptic curve used during ECDHE key exchange. The string "NONE" is returned if no curve was used.
-
 ### s2n\_connection\_get\_selected\_cert
 
 ```c
@@ -1563,14 +1262,6 @@ Return the certificate that was used during the TLS handshake.
 This function returns NULL if the certificate selection phase of the handshake has not completed
  or if a certificate was not requested by the peer.
 
-### s2n\_cert\_chain\_get\_length
-
-```c
-int s2n_cert_chain_get_length(const struct s2n_cert_chain_and_key *chain_and_key, uint32_t *cert_length);
-```
-
-**s2n_cert_chain_get_length** gets the length of the certificate chain `chain_and_key`. If the certificate chain `chain_and_key` is NULL an error is thrown.
-
 ### s2n\_cert\_chain\_get\_cert
 
 ```c
@@ -1578,56 +1269,6 @@ int s2n_cert_chain_get_cert(const struct s2n_cert_chain_and_key *chain_and_key, 
 ```
 
 **s2n_cert_chain_get_cert** gets the certificate `out_cert` present at the index `cert_idx` of the certificate chain `chain_and_key`.  If the certificate chain `chain_and_key` is NULL or the certificate index value is not in the acceptable range for the input certificate chain, an error is thrown. Note that the index of the head_cert is zero.
-
-### s2n\_cert\_get\_der
-
-```c
-int s2n_cert_get_der(const struct s2n_cert *cert, const uint8_t **out_cert_der, uint32_t *cert_length);
-```
-
-**s2n_cert_get_der** gets the certificate `cert` in .der format which is returned in the buffer `out_cert_der`, `cert_len` represents the length of the certificate.
-
-### s2n\_connection\_get_peer\_cert\_chain
-
-```c
-int s2n_connection_get_peer_cert_chain(const struct s2n_connection *conn, struct s2n_cert_chain_and_key *s2n_cert_chain_and_key);
-```
-
-**s2n_connection_get_peer_cert_chain** gets the validated peer certificate chain from the s2n connection object.
-
-### s2n\_cert\_get\_x509\_extension\_value\_length
-
-```c
-int s2n_cert_get_x509_extension_value_length(struct s2n_cert *cert, const uint8_t *oid, uint32_t ext_value_len);
-```
-
-**s2n_cert_get_x509_extension_value_length** gets the length of the DER encoding of an ASN.1 X.509 certificate extension value.
-
-
-### s2n\_cert\_get\_x509\_extension\_value
-
-```c
-int s2n_cert_get_x509_extension_value(struct s2n_cert *cert, const uint8_t *oid, uint8_t *ext_value, uint32_t *ext_value_len, bool *critical);
-```
-
-**s2n_cert_get_x509_extension_value** gets the DER encoding of an ASN.1 X.509 certificate extension value, it's length and a boolean critical.
-
-
-### s2n\_cert\_get\_utf8\_string\_from\_extension\_data\_length
-
-```c
-int s2n_cert_get_utf8_string_from_extension_data_length(const uint8_t *extension_data, uint32_t extension_len, uint32_t *utf8_str_len);
-```
-
-**s2n_cert_get_utf8_string_from_extension_data** gets the UTF8 String length of the ASN.1 X.509 certificate extension data.
-
-### s2n\_cert\_get\_utf8\_string\_from\_extension\_data
-
-```c
-int s2n_cert_get_utf8_string_from_extension_data(const uint8_t *extension_data, uint32_t extension_len, uint8_t *out_data, uint32_t *out_len);
-```
-
-**s2n_cert_get_utf8_string_from_extension_data** gets the UTF8 String representation of the DER encoded ASN.1 X.509 certificate extension data.
 
 ### Session Resumption Related calls
 
